@@ -1,0 +1,10 @@
+{
+  "name": "HA Notify",
+  "author": "vkuzmenko",
+  "flags": ["_root"],
+  "publish": {
+    "description": "Receive Home Assistant notifications in Steam Deck Gaming Mode",
+    "tags": ["notification", "home-assistant", "automation"],
+    "image": "https://brands.home-assistant.io/homeassistant/logo.png"
+  }
+}
