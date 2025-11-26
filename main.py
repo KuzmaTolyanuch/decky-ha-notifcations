@@ -28,10 +28,10 @@ class Plugin:
     async def _main(self):
         """Initialize the plugin"""
         logger.info("HA Notify plugin starting...")
-        self.notification_queue = []  # Store notifications for frontend to poll
         
-        # Read port from settings or use default
-        self.port = decky_plugin.get_setting("port", 8888)
+        # Use a fixed port (or load from file if needed)
+        self.port = 8888
+        self.notification_queue = []  # Store notifications for frontend to poll
         
         # Create web server for receiving notifications
         self.app = web.Application()
@@ -64,7 +64,6 @@ class Plugin:
             data = await request.json()
             title = data.get('title', 'Home Assistant')
             message = data.get('message', 'Notification')
-            duration = data.get('duration', 5000)
             
             logger.info(f"Received notification - Title: {title}, Message: {message}")
             
@@ -74,9 +73,6 @@ class Plugin:
                 'message': message,
                 'timestamp': __import__('time').time()
             })
-            
-            # Show notification via Decky's toast system
-            decky_plugin.logger.info(f"Notification: {title} - {message}")
             
             return web.Response(
                 text='{"status": "ok"}',
@@ -91,12 +87,6 @@ class Plugin:
                 content_type='application/json',
                 status=500
             )
-    
-    async def get_pending_notifications(self):
-        """Frontend calls this to get new notifications"""
-        notifications = self.notification_queue.copy()
-        self.notification_queue.clear()
-        return notifications
     
     async def health_check(self, request):
         """Health check endpoint"""
@@ -115,18 +105,28 @@ class Plugin:
         Requires plugin reload to take effect
         """
         try:
-            decky_plugin.set_setting("port", port)
+            self.port = port
             logger.info(f"Port changed to {port}. Reload plugin to apply.")
             return True
         except Exception as e:
             logger.error(f"Failed to set port: {e}")
             return False
     
+    async def get_pending_notifications(self) -> list:
+        """
+        Get pending notifications and clear the queue
+        Called by frontend to poll for new notifications
+        """
+        notifications = self.notification_queue.copy()
+        self.notification_queue.clear()
+        return notifications
+    
     async def get_stats(self) -> dict:
         """Return plugin statistics"""
         return {
             "port": self.port,
-            "status": "running"
+            "status": "running",
+            "pending_notifications": len(self.notification_queue)
         }
     
     async def _unload(self):
