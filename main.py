@@ -28,6 +28,7 @@ class Plugin:
     async def _main(self):
         """Initialize the plugin"""
         logger.info("HA Notify plugin starting...")
+        self.notification_queue = []  # Store notifications for frontend to poll
         
         # Read port from settings or use default
         self.port = decky_plugin.get_setting("port", 8888)
@@ -67,6 +68,13 @@ class Plugin:
             
             logger.info(f"Received notification - Title: {title}, Message: {message}")
             
+            # Add to queue for frontend to pick up
+            self.notification_queue.append({
+                'title': title,
+                'message': message,
+                'timestamp': __import__('time').time()
+            })
+            
             # Show notification via Decky's toast system
             decky_plugin.logger.info(f"Notification: {title} - {message}")
             
@@ -83,6 +91,12 @@ class Plugin:
                 content_type='application/json',
                 status=500
             )
+    
+    async def get_pending_notifications(self):
+        """Frontend calls this to get new notifications"""
+        notifications = self.notification_queue.copy()
+        self.notification_queue.clear()
+        return notifications
     
     async def health_check(self, request):
         """Health check endpoint"""
