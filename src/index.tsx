@@ -1,12 +1,17 @@
 import {
   ButtonItem,
-  definePlugin,
   PanelSection,
   PanelSectionRow,
-  ServerAPI,
-  staticClasses,
-} from "decky-frontend-lib";
-import { VFC, useState, useEffect } from "react";
+  staticClasses
+} from "@decky/ui";
+
+import {
+  callable,
+  definePlugin,
+  toaster,
+} from "@decky/api";
+
+import { useState, useEffect, VFC } from "react";
 import { FaBell } from "react-icons/fa";
 
 interface Notification {
@@ -21,7 +26,10 @@ interface PluginStats {
   pending_notifications: number;
 }
 
-const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
+const getStats = callable<[], PluginStats>("get_stats");
+const getPendingNotifications = callable<[], Notification[]>("get_pending_notifications");
+
+const Content: VFC = () => {
   const [stats, setStats] = useState<PluginStats | null>(null);
 
   useEffect(() => {
@@ -30,20 +38,15 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
   const loadStats = async () => {
     try {
-      const result = await serverAPI.callPluginMethod<{}, PluginStats>(
-        "get_stats",
-        {}
-      );
-      if (result.success) {
-        setStats(result.result);
-      }
+      const result = await getStats();
+      setStats(result);
     } catch (error) {
       console.error("Failed to load stats:", error);
     }
   };
 
   const testNotification = () => {
-    DeckyPluginLoader.toaster.toast({
+    toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
@@ -107,41 +110,40 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   );
 };
 
-let pollInterval: number | undefined;
+export default definePlugin(() => {
+  console.log("HA Notify initializing");
 
-const checkForNotifications = async (serverApi: ServerAPI) => {
-  try {
-    const result = await serverApi.callPluginMethod<{}, Notification[]>(
-      "get_pending_notifications",
-      {}
-    );
+  let pollInterval: number | undefined;
 
-    if (result.success && result.result && result.result.length > 0) {
-      result.result.forEach((notif: Notification) => {
-        DeckyPluginLoader.toaster.toast({
-          title: notif.title,
-          body: notif.message,
-          duration: 8000,
+  const checkForNotifications = async () => {
+    try {
+      const notifications = await getPendingNotifications();
+
+      if (notifications && notifications.length > 0) {
+        notifications.forEach((notif: Notification) => {
+          toaster.toast({
+            title: notif.title,
+            body: notif.message,
+            duration: 8000,
+          });
         });
-      });
+      }
+    } catch (error) {
+      // Silently handle
     }
-  } catch (error) {
-    // Silently handle errors
-  }
-};
+  };
 
-export default definePlugin((serverApi: ServerAPI) => {
-  // Start polling for notifications
-  pollInterval = window.setInterval(() => checkForNotifications(serverApi), 1000);
+  pollInterval = window.setInterval(checkForNotifications, 1000);
 
   return {
-    title: <div className={staticClasses.Title}>HA Notify</div>,
-    content: <Content serverAPI={serverApi} />,
+    name: "HA Notify",
+    titleView: <div className={staticClasses.Title}>HA Notify</div>,
+    content: <Content />,
     icon: <FaBell />,
     onDismount() {
+      console.log("HA Notify unloading");
       if (pollInterval) {
         clearInterval(pollInterval);
-        pollInterval = undefined;
       }
     },
   };

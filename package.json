@@ -1,7 +1,8 @@
 {
-  "name": "ha-notify",
-  "version": "1.0.0",
-  "description": "Home Assistant notifications for Steam Deck",
+  "name": "decky-plugin-template",
+  "version": "0.0.1",
+  "description": "A template to quickly create decky plugins from scratch, based on TypeScript and webpack",
+  "type": "module",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
@@ -9,16 +10,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KuzmaTolyanuch/decky-ha-notifications.git"
+    "url": "git+https://github.com/KuzmaTolyanuch/decky-ha-notifcations.git"
   },
   "keywords": [
     "decky",
     "plugin",
-    "home-assistant",
-    "notifications"
+    "plugin-template",
+    "steam-deck",
+    "deck"
   ],
-  "author": "KuzmaTolyanuch",
+  "author": "You <you@you.tld>",
   "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/KuzmaTolyanuch/decky-ha-notifcations/issues"
+  },
+  "homepage": "https://github.com/KuzmaTolyanuch/decky-ha-notifcations#readme",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
     "@decky/ui": "^4.11.0",

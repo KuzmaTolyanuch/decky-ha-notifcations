@@ -4,16 +4,21 @@ import os
 # For easy intellisense checkout the decky-loader code repo
 # and add the `decky-loader/plugin/imports` path to `python.analysis.extraPaths` in `.vscode/settings.json`
 import decky
+import asyncio
 
 class Plugin:
-    """
-    Home Assistant Notification Plugin for Steam Deck
-    Receives notifications from Home Assistant and displays them in Gaming Mode
-    """
-    
+    # A normal method. It can be called from the TypeScript side using @decky/api.
+    async def add(self, left: int, right: int) -> int:
+        return left + right
+
+    async def long_running(self):
+        await asyncio.sleep(15)
+        # Passing through a bunch of random data, just as an example
+        await decky.emit("timer_event", "Hello from the backend!", True, 2)
+
+    # Asyncio-compatible long-running code, executed in a task when the plugin is loaded
     async def _main(self):
-        """Initialize the plugin"""
-        decky.logger.info("Starting HA Notify plugin...")
+        decky.logger.info("HA Notify starting...")
         
         from aiohttp import web
         import time
@@ -21,12 +26,10 @@ class Plugin:
         self.port = 8888
         self.notification_queue = []
         
-        # Create web server for receiving notifications
         app = web.Application()
         app.router.add_post('/notify', self.handle_notification)
         app.router.add_get('/health', self.health_check)
         
-        # Start server
         self.runner = web.AppRunner(app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
@@ -35,7 +38,6 @@ class Plugin:
         decky.logger.info(f"Listening on port {self.port}")
     
     async def handle_notification(self, request):
-        """Handle incoming notification from Home Assistant"""
         try:
             import time
             data = await request.json()
@@ -58,7 +60,6 @@ class Plugin:
             return web.json_response({'status': 'error', 'message': str(e)}, status=500)
     
     async def health_check(self, request):
-        """Health check endpoint"""
         from aiohttp import web
         return web.json_response({
             'status': 'healthy',
@@ -67,7 +68,6 @@ class Plugin:
         })
     
     async def get_pending_notifications(self):
-        """Get pending notifications and clear the queue"""
         notifications = self.notification_queue.copy()
         self.notification_queue.clear()
         
@@ -77,26 +77,20 @@ class Plugin:
         return notifications
     
     async def get_stats(self):
-        """Return plugin statistics"""
         return {
             "port": self.port,
             "status": "running",
             "pending_notifications": len(self.notification_queue)
         }
     
+    # Function called first during the unload process, utilize this to handle your plugin being stopped, but not
+    # completely removed
     async def _unload(self):
-        """Cleanup when plugin unloads"""
         decky.logger.info("Shutting down...")
         if hasattr(self, 'site'):
             await self.site.stop()
         if hasattr(self, 'runner'):
             await self.runner.cleanup()
-
-    # Function called first during the unload process, utilize this to handle your plugin being stopped, but not
-    # completely removed
-    async def _unload(self):
-        decky.logger.info("Goodnight World!")
-        pass
 
     # Function called after `_unload` during uninstall, utilize this to clean up processes and other remnants of your
     # plugin that may remain on the system
