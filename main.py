@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 from aiohttp import web
-import asyncio
+import json
 
 # Add py_modules to path
 py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
@@ -56,8 +56,7 @@ class Plugin:
         Expected JSON payload:
         {
             "title": "Notification Title",
-            "message": "Notification message",
-            "duration": 5000  # optional, milliseconds
+            "message": "Notification message"
         }
         """
         try:
@@ -68,66 +67,77 @@ class Plugin:
             logger.info(f"Received notification - Title: {title}, Message: {message}")
             
             # Add to queue for frontend to pick up
+            import time
             self.notification_queue.append({
                 'title': title,
                 'message': message,
-                'timestamp': __import__('time').time()
+                'timestamp': time.time()
             })
             
-            return web.Response(
-                text='{"status": "ok"}',
-                content_type='application/json',
-                status=200
-            )
+            return web.json_response({'status': 'ok'})
             
         except Exception as e:
-            logger.error(f"Error handling notification: {e}")
-            return web.Response(
-                text=f'{{"status": "error", "message": "{str(e)}"}}',
-                content_type='application/json',
+            logger.error(f"Error handling notification: {e}", exc_info=True)
+            return web.json_response(
+                {'status': 'error', 'message': str(e)},
                 status=500
             )
     
     async def health_check(self, request):
         """Health check endpoint"""
-        return web.Response(
-            text='{"status": "healthy", "service": "HA Notify"}',
-            content_type='application/json'
-        )
+        try:
+            return web.json_response({
+                'status': 'healthy',
+                'service': 'HA Notify',
+                'port': self.port,
+                'pending': len(self.notification_queue)
+            })
+        except Exception as e:
+            logger.error(f"Health check error: {e}", exc_info=True)
+            return web.json_response(
+                {'status': 'error', 'message': str(e)},
+                status=500
+            )
     
-    async def get_port(self) -> int:
-        """Return the current port"""
+    async def get_port(self):
+        """Return the current port - called by frontend"""
         return self.port
     
-    async def set_port(self, port: int) -> bool:
-        """
-        Change the listening port
-        Requires plugin reload to take effect
-        """
-        try:
-            self.port = port
-            logger.info(f"Port changed to {port}. Reload plugin to apply.")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to set port: {e}")
-            return False
+    async def set_port(self, port: int):
+        """Change the listening port"""
+        self.port = port
+        logger.info(f"Port changed to {port}. Reload plugin to apply.")
+        return True
     
-    async def get_pending_notifications(self) -> list:
+    async def get_pending_notifications(self):
         """
         Get pending notifications and clear the queue
         Called by frontend to poll for new notifications
         """
-        notifications = self.notification_queue.copy()
-        self.notification_queue.clear()
-        return notifications
+        try:
+            notifications = self.notification_queue.copy()
+            self.notification_queue.clear()
+            logger.info(f"Returning {len(notifications)} notifications to frontend")
+            return notifications
+        except Exception as e:
+            logger.error(f"Error getting notifications: {e}", exc_info=True)
+            return []
     
-    async def get_stats(self) -> dict:
-        """Return plugin statistics"""
-        return {
-            "port": self.port,
-            "status": "running",
-            "pending_notifications": len(self.notification_queue)
-        }
+    async def get_stats(self):
+        """Return plugin statistics - called by frontend"""
+        try:
+            return {
+                "port": self.port,
+                "status": "running",
+                "pending_notifications": len(self.notification_queue)
+            }
+        except Exception as e:
+            logger.error(f"Error getting stats: {e}", exc_info=True)
+            return {
+                "port": self.port,
+                "status": "error",
+                "pending_notifications": 0
+            }
     
     async def _unload(self):
         """Cleanup when plugin unloads"""
@@ -139,4 +149,4 @@ class Plugin:
                 await self.runner.cleanup()
             logger.info("HA Notify plugin unloaded successfully")
         except Exception as e:
-            logger.error(f"Error during unload: {e}")
+            logger.error(f"Error during unload: {e}", exc_info=True)
