@@ -5,8 +5,6 @@ import {
   PanelSectionRow,
   ServerAPI,
   staticClasses,
-  Router,
-  toaster,
 } from "decky-frontend-lib";
 import { VFC, useState, useEffect } from "react";
 import { FaBell } from "react-icons/fa";
@@ -47,7 +45,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   };
 
   const testNotification = () => {
-    toaster.toast({
+    // Use DeckyPluginLoader.toaster - this is the correct way!
+    DeckyPluginLoader.toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
@@ -93,7 +92,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       <PanelSection title="Usage">
         <PanelSectionRow>
           <div style={{ fontSize: "11px", opacity: 0.7 }}>
-            <p>From Home Assistant:</p>
+            <p>Send from Home Assistant:</p>
             <code style={{
               display: "block",
               padding: "8px",
@@ -101,9 +100,10 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
               borderRadius: "4px",
               marginTop: "8px",
               fontSize: "10px",
+              whiteSpace: "pre-wrap",
             }}>
-              curl -X POST http://steamdeck:{port}/notify<br />
-              -H "Content-Type: application/json"<br />
+              curl -X POST http://steamdeck:{port}/notify{'\n'}
+              -H "Content-Type: application/json"{'\n'}
               -d '{`{"title":"Alert","message":"Door opened"}`}'
             </code>
           </div>
@@ -114,7 +114,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
-  // Use number type for browser setInterval
   let pollInterval: number;
 
   const checkForNotifications = async () => {
@@ -126,11 +125,11 @@ export default definePlugin((serverApi: ServerAPI) => {
 
       if (result.success && result.result && result.result.length > 0) {
         result.result.forEach((notif: Notification) => {
-          toaster.toast({
+          // THIS IS THE KEY - Use DeckyPluginLoader.toaster
+          DeckyPluginLoader.toaster.toast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            critical: false,
           });
         });
       }
@@ -138,6 +137,9 @@ export default definePlugin((serverApi: ServerAPI) => {
       // Silently handle polling errors
     }
   };
+
+  // Start polling on mount
+  pollInterval = setInterval(checkForNotifications, 1000) as unknown as number;
 
   return {
     title: <div className={staticClasses.Title}>HA Notify</div>,
@@ -147,11 +149,6 @@ export default definePlugin((serverApi: ServerAPI) => {
       if (pollInterval) {
         clearInterval(pollInterval);
       }
-    },
-    async onMount() {
-      // Start polling for notifications
-      // Cast to number since we're in browser context
-      pollInterval = setInterval(checkForNotifications, 1000) as unknown as number;
     },
   };
 });
