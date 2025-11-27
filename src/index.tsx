@@ -47,7 +47,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   };
 
   const testNotification = () => {
-    // Show toast notification directly
     toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
@@ -115,7 +114,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
-  let pollInterval: NodeJS.Timer;
+  // Use number type for browser setInterval
+  let pollInterval: number;
 
   const checkForNotifications = async () => {
     try {
@@ -126,7 +126,6 @@ export default definePlugin((serverApi: ServerAPI) => {
 
       if (result.success && result.result && result.result.length > 0) {
         result.result.forEach((notif: Notification) => {
-          // Show toast notification in Gaming Mode
           toaster.toast({
             title: notif.title,
             body: notif.message,
@@ -151,7 +150,8 @@ export default definePlugin((serverApi: ServerAPI) => {
     },
     async onMount() {
       // Start polling for notifications
-      pollInterval = setInterval(checkForNotifications, 1000);
+      // Cast to number since we're in browser context
+      pollInterval = setInterval(checkForNotifications, 1000) as unknown as number;
     },
   };
 });
