@@ -1,10 +1,10 @@
 {
   "name": "HA Notify",
-  "author": "vkuzmenko",
+  "author": "KuzmaTolyanuch",
   "flags": ["_root"],
   "publish": {
+    "tags": ["home-assistant", "notifications"],
     "description": "Receive Home Assistant notifications in Steam Deck Gaming Mode",
-    "tags": ["notification", "home-assistant", "automation"],
-    "image": "https://brands.home-assistant.io/homeassistant/logo.png"
+    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/decky-loader"
   }
 }

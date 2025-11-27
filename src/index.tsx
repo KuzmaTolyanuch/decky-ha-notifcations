@@ -6,9 +6,7 @@ import {
   ServerAPI,
   staticClasses,
 } from "decky-frontend-lib";
-
 import { VFC, useState, useEffect } from "react";
-
 import { FaBell } from "react-icons/fa";
 
 interface Notification {
@@ -24,7 +22,6 @@ interface PluginStats {
 }
 
 const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
-  const [port, setPort] = useState<number>(8888);
   const [stats, setStats] = useState<PluginStats | null>(null);
 
   useEffect(() => {
@@ -39,7 +36,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       );
       if (result.success) {
         setStats(result.result);
-        setPort(result.result.port);
       }
     } catch (error) {
       console.error("Failed to load stats:", error);
@@ -50,7 +46,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     DeckyPluginLoader.toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
-      duration: 15_000,
+      duration: 5000,
     });
   };
 
@@ -68,7 +64,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         <PanelSectionRow>
           <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
             <span>Port:</span>
-            <span>{stats?.port || "N/A"}</span>
+            <span>{stats?.port || 8888}</span>
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -81,10 +77,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
       <PanelSection title="Test">
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={testNotification}
-          >
+          <ButtonItem layout="below" onClick={testNotification}>
             Send Test Notification
           </ButtonItem>
         </PanelSectionRow>
@@ -92,20 +85,20 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
       <PanelSection title="Usage">
         <PanelSectionRow>
-          <div style={{ fontSize: "11px", opacity: 0.7 }}>
-            <p>Send from Home Assistant:</p>
+          <div style={{ fontSize: "11px", opacity: 0.7, lineHeight: "1.4" }}>
+            <p style={{ marginBottom: "8px" }}>From Home Assistant:</p>
             <code style={{
               display: "block",
               padding: "8px",
               background: "#1a1a1a",
               borderRadius: "4px",
-              marginTop: "8px",
               fontSize: "10px",
               whiteSpace: "pre-wrap",
+              wordBreak: "break-all"
             }}>
-              curl -X POST http://steamdeck:{port}/notify{'\n'}
+              curl -X POST http://steamdeck:{stats?.port || 8888}/notify{'\n'}
               -H "Content-Type: application/json"{'\n'}
-              -d '{`{"title":"Alert","message":"Door opened"}`}'
+              -d '{`{"title":"Alert","message":"Test"}`}'
             </code>
           </div>
         </PanelSectionRow>
@@ -133,13 +126,12 @@ const checkForNotifications = async (serverApi: ServerAPI) => {
       });
     }
   } catch (error) {
-    // Silently handle polling errors
+    // Silently handle errors
   }
 };
 
-// This export structure is critical - must match exactly
 export default definePlugin((serverApi: ServerAPI) => {
-  // Start polling immediately
+  // Start polling for notifications
   pollInterval = window.setInterval(() => checkForNotifications(serverApi), 1000);
 
   return {
