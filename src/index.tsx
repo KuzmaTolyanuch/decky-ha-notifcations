@@ -11,7 +11,7 @@ import {
   toaster,
 } from "@decky/api";
 
-import { useState, useEffect, VFC } from "react";
+import { useState, useEffect } from "react";
 import { FaBell } from "react-icons/fa";
 
 interface Notification {
@@ -29,7 +29,7 @@ interface PluginStats {
 const getStats = callable<[], PluginStats>("get_stats");
 const getPendingNotifications = callable<[], Notification[]>("get_pending_notifications");
 
-const Content: VFC = () => {
+const Content = () => {
   const [stats, setStats] = useState<PluginStats | null>(null);
 
   useEffect(() => {
