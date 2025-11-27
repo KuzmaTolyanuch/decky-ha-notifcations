@@ -4,13 +4,6 @@ import logging
 from aiohttp import web
 import time
 
-# Add py_modules to path
-py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
-sys.path.append(py_modules_path)
-
-# Import decky_plugin
-import decky_plugin
-
 logging.basicConfig(
     level=logging.INFO,
     format='[HA Notify] %(asctime)s %(levelname)s %(message)s'
@@ -104,7 +97,11 @@ class Plugin:
         try:
             notifications = self.notification_queue.copy()
             self.notification_queue.clear()
-            logger.info(f"Returning {len(notifications)} notifications to frontend")
+            
+            # Only log when there are actual notifications
+            if notifications:
+                logger.info(f"Returning {len(notifications)} notification(s) to frontend")
+            
             return notifications
         except Exception as e:
             logger.error(f"Error getting notifications: {e}", exc_info=True)
