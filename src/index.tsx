@@ -13,6 +13,7 @@ import {
 
 import { useState, useEffect } from "react";
 import { FaBell } from "react-icons/fa";
+import { SiHomeassistant } from "react-icons/si";  // Home Assistant icon
 
 interface Notification {
   title: string;
@@ -50,6 +51,7 @@ const Content = () => {
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
+      logo: <SiHomeassistant size={24} color="#41BDF5" />,  // HA blue color
     });
   };
 
@@ -125,6 +127,7 @@ export default definePlugin(() => {
             title: notif.title,
             body: notif.message,
             duration: 8000,
+            logo: <SiHomeassistant size={24} color="#41BDF5" />,  // Same HA icon for all
           });
         });
       }
