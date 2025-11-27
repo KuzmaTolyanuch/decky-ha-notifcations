@@ -1,7 +1,8 @@
 {
   "name": "HA Notify",
   "author": "KuzmaTolyanuch",
-  "flags": ["_root"],
+  "flags": [],
+  "api_version": 1,
   "publish": {
     "tags": ["home-assistant", "notifications"],
     "description": "Receive Home Assistant notifications in Steam Deck Gaming Mode",
