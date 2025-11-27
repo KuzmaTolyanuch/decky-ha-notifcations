@@ -6,7 +6,9 @@ import {
   ServerAPI,
   staticClasses,
 } from "decky-frontend-lib";
+
 import { VFC, useState, useEffect } from "react";
+
 import { FaBell } from "react-icons/fa";
 
 interface Notification {
@@ -48,7 +50,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     DeckyPluginLoader.toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
-      duration: 5000,
+      duration: 15_000,
     });
   };
 

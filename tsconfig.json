@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
+    "outDir": "dist",
+    "module": "ESNext",
     "target": "ES2020",
-    "lib": ["ES2020", "DOM"],
     "jsx": "react",
     "jsxFactory": "window.SP_REACT.createElement",
-    "jsxFragmentFactory": "window.SP_REACT.Fragment",
-    "module": "ESNext",
+    "declaration": false,
     "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "esModuleInterop": true,
-    "isolatedModules": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
     "strict": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": false
+    "suppressImplicitAnyIndexErrors": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true
   },
   "include": ["src"],
   "exclude": ["node_modules"]
