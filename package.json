@@ -1,15 +1,14 @@
 {
-  "name": "ha-notify",
+  "name": "decky-ha-notifications",
   "version": "1.0.0",
-  "description": "Home Assistant notifications for Steam Deck",
+  "description": "Home Assistant notifications for Steam Deck Gaming Mode",
   "scripts": {
     "build": "shx rm -rf dist && rollup -c",
-    "watch": "rollup -c -w",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "watch": "rollup -c -w"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/ha-notify.git"
+    "url": "git+https://github.com/yourusername/decky-ha-notifications.git"
   },
   "keywords": [
     "decky",
@@ -20,10 +19,6 @@
   ],
   "author": "vkuzmenko",
   "license": "GPL-3.0-or-later",
-  "bugs": {
-    "url": "https://github.com/yourusername/ha-notify/issues"
-  },
-  "homepage": "https://github.com/yourusername/ha-notify#readme",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.1.0",
     "@rollup/plugin-json": "^4.1.0",

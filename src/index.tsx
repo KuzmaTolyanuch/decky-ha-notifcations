@@ -1,10 +1,11 @@
 import {
+  ButtonItem,
   definePlugin,
-  ServerAPI,
   PanelSection,
   PanelSectionRow,
-  ButtonItem,
+  ServerAPI,
   staticClasses,
+  Router,
   toaster,
 } from "decky-frontend-lib";
 import { VFC, useState, useEffect } from "react";
@@ -45,55 +46,78 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     }
   };
 
-  const showNotification = (title: string, message: string) => {
+  const testNotification = () => {
+    // Show toast notification directly
     toaster.toast({
-      title: title,
-      body: message,
-      duration: 8000,
-      critical: true,
-      showCloseButton: true,
+      title: "Test Notification",
+      body: "This is a test from HA Notify!",
+      duration: 5000,
     });
   };
 
-  const testNotification = () => {
-    showNotification("Test Notification", "This is a test from HA Notify plugin!");
-  };
-
   return (
-    <PanelSection title="Status">
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-          <span>Service:</span>
-          <span style={{ color: stats?.status === "running" ? "#00ff00" : "#ff0000" }}>
-            {stats?.status || "Unknown"}
-          </span>
-        </div>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-          <span>Port:</span>
-          <span>{stats?.port || "N/A"}</span>
-        </div>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-          <span>Pending:</span>
-          <span>{stats?.pending_notifications || 0}</span>
-        </div>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={testNotification}>
-          Send Test Notification
-        </ButtonItem>
-      </PanelSectionRow>
-    </PanelSection>
+    <>
+      <PanelSection title="Status">
+        <PanelSectionRow>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>Service:</span>
+            <span style={{ color: stats?.status === "running" ? "#0f0" : "#f00" }}>
+              {stats?.status || "Unknown"}
+            </span>
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>Port:</span>
+            <span>{stats?.port || "N/A"}</span>
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>Pending:</span>
+            <span>{stats?.pending_notifications || 0}</span>
+          </div>
+        </PanelSectionRow>
+      </PanelSection>
+
+      <PanelSection title="Test">
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={testNotification}
+          >
+            Send Test Notification
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+
+      <PanelSection title="Usage">
+        <PanelSectionRow>
+          <div style={{ fontSize: "11px", opacity: 0.7 }}>
+            <p>From Home Assistant:</p>
+            <code style={{
+              display: "block",
+              padding: "8px",
+              background: "#1a1a1a",
+              borderRadius: "4px",
+              marginTop: "8px",
+              fontSize: "10px",
+            }}>
+              curl -X POST http://steamdeck:{port}/notify<br />
+              -H "Content-Type: application/json"<br />
+              -d '{`{"title":"Alert","message":"Door opened"}`}'
+            </code>
+          </div>
+        </PanelSectionRow>
+      </PanelSection>
+    </>
   );
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
-  let pollInterval: NodeJS.Timeout;
+  let pollInterval: NodeJS.Timer;
 
-  const pollForNotifications = async () => {
+  const checkForNotifications = async () => {
     try {
       const result = await serverApi.callPluginMethod<{}, Notification[]>(
         "get_pending_notifications",
@@ -101,31 +125,33 @@ export default definePlugin((serverApi: ServerAPI) => {
       );
 
       if (result.success && result.result && result.result.length > 0) {
-        const notifications = result.result;
-        
-        notifications.forEach((notif: Notification) => {
+        result.result.forEach((notif: Notification) => {
+          // Show toast notification in Gaming Mode
           toaster.toast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            critical: true,
-            showCloseButton: true,
+            critical: false,
           });
         });
       }
     } catch (error) {
-      console.error("Error polling notifications:", error);
+      // Silently handle polling errors
     }
   };
-
-  pollInterval = setInterval(pollForNotifications, 1000);
 
   return {
     title: <div className={staticClasses.Title}>HA Notify</div>,
     content: <Content serverAPI={serverApi} />,
     icon: <FaBell />,
     onDismount() {
-      clearInterval(pollInterval);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    },
+    async onMount() {
+      // Start polling for notifications
+      pollInterval = setInterval(checkForNotifications, 1000);
     },
   };
 });

@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 from aiohttp import web
-import json
+import time
 
 # Add py_modules to path
 py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
@@ -13,8 +13,7 @@ import decky_plugin
 
 logging.basicConfig(
     level=logging.INFO,
-    format='[HA Notify] %(asctime)s %(levelname)s %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    format='[HA Notify] %(asctime)s %(levelname)s %(message)s'
 )
 
 logger = logging.getLogger()
@@ -27,24 +26,25 @@ class Plugin:
     
     async def _main(self):
         """Initialize the plugin"""
-        logger.info("HA Notify plugin starting...")
+        logger.info("Starting HA Notify plugin...")
         
         # Use a fixed port (or load from file if needed)
         self.port = 8888
         self.notification_queue = []  # Store notifications for frontend to poll
         
         # Create web server for receiving notifications
-        self.app = web.Application()
-        self.app.router.add_post('/notify', self.handle_notification)
-        self.app.router.add_get('/health', self.health_check)
+        app = web.Application()
+        app.router.add_post('/notify', self.handle_notification)
+        app.router.add_get('/health', self.health_check)
         
         # Start server
         try:
-            self.runner = web.AppRunner(self.app)
+            self.runner = web.AppRunner(app)
             await self.runner.setup()
             self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
             await self.site.start()
-            logger.info(f"HA Notify listening on port {self.port}")
+            
+            logger.info(f"Listening on port {self.port}")
         except Exception as e:
             logger.error(f"Failed to start server: {e}")
             raise
@@ -61,13 +61,12 @@ class Plugin:
         """
         try:
             data = await request.json()
-            title = data.get('title', 'Home Assistant')
-            message = data.get('message', 'Notification')
+            title = data.get('title', 'Notification')
+            message = data.get('message', '')
             
-            logger.info(f"Received notification - Title: {title}, Message: {message}")
+            logger.info(f"Received: {title} - {message}")
             
             # Add to queue for frontend to pick up
-            import time
             self.notification_queue.append({
                 'title': title,
                 'message': message,
@@ -75,9 +74,8 @@ class Plugin:
             })
             
             return web.json_response({'status': 'ok'})
-            
         except Exception as e:
-            logger.error(f"Error handling notification: {e}", exc_info=True)
+            logger.error(f"Error: {e}")
             return web.json_response(
                 {'status': 'error', 'message': str(e)},
                 status=500
@@ -88,7 +86,6 @@ class Plugin:
         try:
             return web.json_response({
                 'status': 'healthy',
-                'service': 'HA Notify',
                 'port': self.port,
                 'pending': len(self.notification_queue)
             })
@@ -98,16 +95,6 @@ class Plugin:
                 {'status': 'error', 'message': str(e)},
                 status=500
             )
-    
-    async def get_port(self):
-        """Return the current port - called by frontend"""
-        return self.port
-    
-    async def set_port(self, port: int):
-        """Change the listening port"""
-        self.port = port
-        logger.info(f"Port changed to {port}. Reload plugin to apply.")
-        return True
     
     async def get_pending_notifications(self):
         """
@@ -141,12 +128,11 @@ class Plugin:
     
     async def _unload(self):
         """Cleanup when plugin unloads"""
-        logger.info("HA Notify plugin unloading...")
+        logger.info("Shutting down...")
         try:
             if hasattr(self, 'site'):
                 await self.site.stop()
             if hasattr(self, 'runner'):
                 await self.runner.cleanup()
-            logger.info("HA Notify plugin unloaded successfully")
         except Exception as e:
             logger.error(f"Error during unload: {e}", exc_info=True)

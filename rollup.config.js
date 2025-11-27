@@ -1,27 +1,23 @@
 import commonjs from '@rollup/plugin-commonjs';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
-import typescript from '@rollup/plugin-typescript';
-import replace from '@rollup/plugin-replace';
 import json from '@rollup/plugin-json';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import replace from '@rollup/plugin-replace';
+import typescript from '@rollup/plugin-typescript';
+import importAssets from 'rollup-plugin-import-assets';
 
 export default {
   input: './src/index.tsx',
   plugins: [
-    commonjs({
-      include: /node_modules/,
-      transformMixedEsModules: true,
-    }),
-    nodeResolve({
-      preferBuiltins: false,
-      browser: true,
-    }),
+    commonjs(),
+    nodeResolve(),
+    typescript(),
     json(),
-    typescript({
-      tsconfig: './tsconfig.json',
-    }),
     replace({
-      preventAssignment: true,
       'process.env.NODE_ENV': JSON.stringify('production'),
+      preventAssignment: true,
+    }),
+    importAssets({
+      publicPath: `http://127.0.0.1:1337/plugins/ha-notify/`
     }),
   ],
   context: 'window',
@@ -35,6 +31,5 @@ export default {
     },
     format: 'iife',
     exports: 'default',
-    name: 'plugin',
   },
 };
