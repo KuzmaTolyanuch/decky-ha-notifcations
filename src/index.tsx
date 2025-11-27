@@ -45,7 +45,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   };
 
   const testNotification = () => {
-    // Use DeckyPluginLoader.toaster - this is the correct way!
     DeckyPluginLoader.toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
@@ -113,33 +112,33 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   );
 };
 
-export default definePlugin((serverApi: ServerAPI) => {
-  let pollInterval: number;
+let pollInterval: number | undefined;
 
-  const checkForNotifications = async () => {
-    try {
-      const result = await serverApi.callPluginMethod<{}, Notification[]>(
-        "get_pending_notifications",
-        {}
-      );
+const checkForNotifications = async (serverApi: ServerAPI) => {
+  try {
+    const result = await serverApi.callPluginMethod<{}, Notification[]>(
+      "get_pending_notifications",
+      {}
+    );
 
-      if (result.success && result.result && result.result.length > 0) {
-        result.result.forEach((notif: Notification) => {
-          // THIS IS THE KEY - Use DeckyPluginLoader.toaster
-          DeckyPluginLoader.toaster.toast({
-            title: notif.title,
-            body: notif.message,
-            duration: 8000,
-          });
+    if (result.success && result.result && result.result.length > 0) {
+      result.result.forEach((notif: Notification) => {
+        DeckyPluginLoader.toaster.toast({
+          title: notif.title,
+          body: notif.message,
+          duration: 8000,
         });
-      }
-    } catch (error) {
-      // Silently handle polling errors
+      });
     }
-  };
+  } catch (error) {
+    // Silently handle polling errors
+  }
+};
 
-  // Start polling on mount
-  pollInterval = setInterval(checkForNotifications, 1000) as unknown as number;
+// This export structure is critical - must match exactly
+export default definePlugin((serverApi: ServerAPI) => {
+  // Start polling immediately
+  pollInterval = window.setInterval(() => checkForNotifications(serverApi), 1000);
 
   return {
     title: <div className={staticClasses.Title}>HA Notify</div>,
@@ -148,6 +147,7 @@ export default definePlugin((serverApi: ServerAPI) => {
     onDismount() {
       if (pollInterval) {
         clearInterval(pollInterval);
+        pollInterval = undefined;
       }
     },
   };
