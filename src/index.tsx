@@ -46,14 +46,12 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   };
 
   const showNotification = (title: string, message: string) => {
-    // THIS IS THE KEY PART - Shows notification in Gaming Mode
     toaster.toast({
       title: title,
       body: message,
       duration: 8000,
       critical: true,
       showCloseButton: true,
-      icon: <FaBell />,
     });
   };
 
@@ -62,66 +60,39 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   };
 
   return (
-    <div style={{ marginTop: "50px", color: "white" }}>
-      <PanelSection title="Status">
-        <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Service Status:</span>
-            <span style={{ color: stats?.status === "running" ? "#00ff00" : "#ff0000" }}>
-              {stats?.status || "Unknown"}
-            </span>
-          </div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Listening Port:</span>
-            <span>{stats?.port || "N/A"}</span>
-          </div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Pending:</span>
-            <span>{stats?.pending_notifications || 0}</span>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-
-      <PanelSection title="Test">
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={testNotification}>
-            Send Test Notification
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-
-      <PanelSection title="Usage">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", opacity: 0.7 }}>
-            <p>Send from Home Assistant:</p>
-            <code style={{ 
-              display: "block", 
-              padding: "10px", 
-              background: "#1a1a1a", 
-              borderRadius: "5px", 
-              marginTop: "10px",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all"
-            }}>
-              curl -X POST http://steamdeck:{port}/notify{"\n"}
-              -H "Content-Type: application/json"{"\n"}
-              -d '{`{"title":"Alert","message":"Test"}`}'
-            </code>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-    </div>
+    <PanelSection title="Status">
+      <PanelSectionRow>
+        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+          <span>Service:</span>
+          <span style={{ color: stats?.status === "running" ? "#00ff00" : "#ff0000" }}>
+            {stats?.status || "Unknown"}
+          </span>
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+          <span>Port:</span>
+          <span>{stats?.port || "N/A"}</span>
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+          <span>Pending:</span>
+          <span>{stats?.pending_notifications || 0}</span>
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <ButtonItem layout="below" onClick={testNotification}>
+          Send Test Notification
+        </ButtonItem>
+      </PanelSectionRow>
+    </PanelSection>
   );
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
   let pollInterval: NodeJS.Timeout;
 
-  // Poll for new notifications every second
   const pollForNotifications = async () => {
     try {
       const result = await serverApi.callPluginMethod<{}, Notification[]>(
@@ -132,7 +103,6 @@ export default definePlugin((serverApi: ServerAPI) => {
       if (result.success && result.result && result.result.length > 0) {
         const notifications = result.result;
         
-        // Display each notification
         notifications.forEach((notif: Notification) => {
           toaster.toast({
             title: notif.title,
@@ -140,7 +110,6 @@ export default definePlugin((serverApi: ServerAPI) => {
             duration: 8000,
             critical: true,
             showCloseButton: true,
-            icon: <FaBell />,
           });
         });
       }
@@ -149,7 +118,6 @@ export default definePlugin((serverApi: ServerAPI) => {
     }
   };
 
-  // Start polling
   pollInterval = setInterval(pollForNotifications, 1000);
 
   return {

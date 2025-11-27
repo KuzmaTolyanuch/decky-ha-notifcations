@@ -3,12 +3,19 @@
     "target": "ES2020",
     "lib": ["ES2020", "DOM"],
     "jsx": "react",
+    "jsxFactory": "SP_REACT.createElement",
+    "jsxFragmentFactory": "SP_REACT.Fragment",
     "module": "ESNext",
     "moduleResolution": "node",
-    "outDir": "./dist",
-    "strict": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "outDir": "./dist"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
