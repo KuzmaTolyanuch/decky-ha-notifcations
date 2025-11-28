@@ -1,73 +1,129 @@
+import decky
+import aiohttp
+import asyncio
+import ssl
+import certifi
 import os
 
-# The decky plugin module is located at decky-loader/plugin
-# For easy intellisense checkout the decky-loader code repo
-# and add the `decky-loader/plugin/imports` path to `python.analysis.extraPaths` in `.vscode/settings.json`
-import decky
-import asyncio
-
 class Plugin:
-    # A normal method. It can be called from the TypeScript side using @decky/api.
-    async def add(self, left: int, right: int) -> int:
-        return left + right
-
-    async def long_running(self):
-        await asyncio.sleep(15)
-        # Passing through a bunch of random data, just as an example
-        await decky.emit("timer_event", "Hello from the backend!", True, 2)
-
-    # Asyncio-compatible long-running code, executed in a task when the plugin is loaded
     async def _main(self):
         decky.logger.info("HA Notify starting...")
         
-        from aiohttp import web
-        import time
+        # Configuration from environment variables
+        self.ha_url = os.getenv("HA_URL")
+        self.ha_token = os.getenv("HA_TOKEN")
         
-        self.port = 8888
+        if not self.ha_token:
+            decky.logger.error("HA_TOKEN environment variable not set!")
+            return
+        
         self.notification_queue = []
+        self.websocket_task = None
         
-        app = web.Application()
-        app.router.add_post('/notify', self.handle_notification)
-        app.router.add_get('/health', self.health_check)
+        # Start WebSocket connection to HA
+        self.websocket_task = asyncio.create_task(self.connect_to_ha())
         
-        self.runner = web.AppRunner(app)
-        await self.runner.setup()
-        self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
-        await self.site.start()
-        
-        decky.logger.info(f"Listening on port {self.port}")
+        decky.logger.info("Plugin initialized")
     
-    async def handle_notification(self, request):
+    async def connect_to_ha(self):
+        """Connect to Home Assistant via WebSocket"""
+        # Create SSL context with proper certificates
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        
+        while True:
+            try:
+                decky.logger.info("Connecting to Home Assistant WebSocket...")
+                
+                # Create connector with SSL context
+                connector = aiohttp.TCPConnector(ssl=ssl_context)
+                
+                async with aiohttp.ClientSession(connector=connector) as session:
+                    # Connect to WebSocket
+                    ws_url = f"{self.ha_url}/api/websocket"
+                    decky.logger.info(f"Connecting to {ws_url}")
+                    
+                    async with session.ws_connect(ws_url) as ws:
+                        decky.logger.info("WebSocket connected, waiting for auth...")
+                        
+                        # Wait for auth_required message
+                        auth_msg = await ws.receive_json()
+                        decky.logger.info(f"Received: {auth_msg.get('type')}")
+                        
+                        if auth_msg.get("type") == "auth_required":
+                            # Send authentication
+                            await ws.send_json({
+                                "type": "auth",
+                                "access_token": self.ha_token
+                            })
+                            
+                            # Wait for auth response
+                            auth_response = await ws.receive_json()
+                            decky.logger.info(f"Auth response: {auth_response.get('type')}")
+                            
+                            if auth_response.get("type") != "auth_ok":
+                                decky.logger.error(f"Authentication failed: {auth_response}")
+                                await asyncio.sleep(10)
+                                continue
+                            
+                            decky.logger.info("Authentication successful")
+                            
+                            # Subscribe to custom event
+                            await ws.send_json({
+                                "id": 1,
+                                "type": "subscribe_events",
+                                "event_type": "steamdeck_notify"
+                            })
+                            
+                            decky.logger.info("Subscribed to steamdeck_notify events")
+                            
+                            # Listen for notifications
+                            async for msg in ws:
+                                if msg.type == aiohttp.WSMsgType.TEXT:
+                                    data = msg.json()
+                                    
+                                    if data.get("type") == "event":
+                                        await self.handle_ha_event(data)
+                                    
+                                elif msg.type == aiohttp.WSMsgType.ERROR:
+                                    decky.logger.error(f"WebSocket error: {ws.exception()}")
+                                    break
+                                elif msg.type == aiohttp.WSMsgType.CLOSED:
+                                    decky.logger.warning("WebSocket closed, reconnecting...")
+                                    break
+                
+            except aiohttp.ClientConnectorError as e:
+                decky.logger.error(f"Connection error: {e}, retrying in 10s...")
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                decky.logger.info("WebSocket task cancelled")
+                break
+            except Exception as e:
+                decky.logger.error(f"WebSocket error: {e}, retrying in 10s...")
+                await asyncio.sleep(10)
+    
+    async def handle_ha_event(self, data):
+        """Handle event from Home Assistant"""
         try:
-            import time
-            data = await request.json()
-            title = data.get('title', 'Notification')
-            message = data.get('message', '')
+            event = data.get("event", {})
+            event_data = event.get("data", {})
+            
+            title = event_data.get("title", "Notification")
+            message = event_data.get("message", "")
             
             decky.logger.info(f"Received: {title} - {message}")
             
+            import time
             self.notification_queue.append({
                 'title': title,
                 'message': message,
                 'timestamp': time.time()
             })
             
-            from aiohttp import web
-            return web.json_response({'status': 'ok'})
         except Exception as e:
-            decky.logger.error(f"Error: {e}")
-            from aiohttp import web
-            return web.json_response({'status': 'error', 'message': str(e)}, status=500)
-    
-    async def health_check(self, request):
-        from aiohttp import web
-        return web.json_response({
-            'status': 'healthy',
-            'port': self.port,
-            'pending': len(self.notification_queue)
-        })
+            decky.logger.error(f"Error handling event: {e}")
     
     async def get_pending_notifications(self):
+        """Get pending notifications and clear the queue"""
         notifications = self.notification_queue.copy()
         self.notification_queue.clear()
         
@@ -77,46 +133,25 @@ class Plugin:
         return notifications
     
     async def get_stats(self):
+        """Return plugin statistics"""
+        ws_status = "disconnected"
+        if self.websocket_task and not self.websocket_task.done():
+            ws_status = "connected"
+        
         return {
-            "port": self.port,
             "status": "running",
-            "pending_notifications": len(self.notification_queue)
+            "pending_notifications": len(self.notification_queue),
+            "websocket_status": ws_status,
+            "ha_url": self.ha_url
         }
     
-    # Function called first during the unload process, utilize this to handle your plugin being stopped, but not
-    # completely removed
     async def _unload(self):
+        """Cleanup when plugin unloads"""
         decky.logger.info("Shutting down...")
-        if hasattr(self, 'site'):
-            await self.site.stop()
-        if hasattr(self, 'runner'):
-            await self.runner.cleanup()
-
-    # Function called after `_unload` during uninstall, utilize this to clean up processes and other remnants of your
-    # plugin that may remain on the system
-    async def _uninstall(self):
-        decky.logger.info("Goodbye World!")
-        pass
-
-    async def start_timer(self):
-        self.loop.create_task(self.long_running())
-
-    # Migrations that should be performed before entering `_main()`.
-    async def _migration(self):
-        decky.logger.info("Migrating")
-        # Here's a migration example for logs:
-        # - `~/.config/decky-template/template.log` will be migrated to `decky.decky_LOG_DIR/template.log`
-        decky.migrate_logs(os.path.join(decky.DECKY_USER_HOME,
-                                               ".config", "decky-template", "template.log"))
-        # Here's a migration example for settings:
-        # - `~/homebrew/settings/template.json` is migrated to `decky.decky_SETTINGS_DIR/template.json`
-        # - `~/.config/decky-template/` all files and directories under this root are migrated to `decky.decky_SETTINGS_DIR/`
-        decky.migrate_settings(
-            os.path.join(decky.DECKY_HOME, "settings", "template.json"),
-            os.path.join(decky.DECKY_USER_HOME, ".config", "decky-template"))
-        # Here's a migration example for runtime data:
-        # - `~/homebrew/template/` all files and directories under this root are migrated to `decky.decky_RUNTIME_DIR/`
-        # - `~/.local/share/decky-template/` all files and directories under this root are migrated to `decky.decky_RUNTIME_DIR/`
-        decky.migrate_runtime(
-            os.path.join(decky.DECKY_HOME, "template"),
-            os.path.join(decky.DECKY_USER_HOME, ".local", "share", "decky-template"))
+        
+        if self.websocket_task:
+            self.websocket_task.cancel()
+            try:
+                await self.websocket_task
+            except asyncio.CancelledError:
+                pass

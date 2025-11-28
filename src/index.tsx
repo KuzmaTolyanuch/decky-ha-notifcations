@@ -13,7 +13,7 @@ import {
 
 import { useState, useEffect } from "react";
 import { FaBell } from "react-icons/fa";
-import { SiHomeassistant } from "react-icons/si";  // Home Assistant icon
+import { SiHomeassistant } from "react-icons/si";
 
 interface Notification {
   title: string;
@@ -22,9 +22,10 @@ interface Notification {
 }
 
 interface PluginStats {
-  port: number;
   status: string;
   pending_notifications: number;
+  websocket_status: string;
+  ha_url: string;
 }
 
 const getStats = callable<[], PluginStats>("get_stats");
@@ -35,6 +36,8 @@ const Content = () => {
 
   useEffect(() => {
     loadStats();
+    const interval = setInterval(loadStats, 5000); // Refresh every 5s
+    return () => clearInterval(interval);
   }, []);
 
   const loadStats = async () => {
@@ -51,7 +54,7 @@ const Content = () => {
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
-      logo: <SiHomeassistant size={24} color="#41BDF5" />,  // HA blue color
+      logo: <SiHomeassistant size={24} color="#41BDF5" />,
     });
   };
 
@@ -60,16 +63,18 @@ const Content = () => {
       <PanelSection title="Status">
         <PanelSectionRow>
           <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-            <span>Service:</span>
-            <span style={{ color: stats?.status === "running" ? "#0f0" : "#f00" }}>
-              {stats?.status || "Unknown"}
+            <span>WebSocket:</span>
+            <span style={{ color: stats?.websocket_status === "connected" ? "#0f0" : "#f00" }}>
+              {stats?.websocket_status || "Unknown"}
             </span>
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-            <span>Port:</span>
-            <span>{stats?.port || 8888}</span>
+            <span>HA URL:</span>
+            <span style={{ fontSize: "10px", opacity: 0.7 }}>
+              {stats?.ha_url || "Not configured"}
+            </span>
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -101,9 +106,11 @@ const Content = () => {
               whiteSpace: "pre-wrap",
               wordBreak: "break-all"
             }}>
-              curl -X POST http://steamdeck:{stats?.port || 8888}/notify{'\n'}
-              -H "Content-Type: application/json"{'\n'}
-              -d '{`{"title":"Alert","message":"Test"}`}'
+              # Fire this event in HA{'\n'}
+              event: steamdeck_notify{'\n'}
+              data:{'\n'}
+              {'  '}title: "Alert"{'\n'}
+              {'  '}message: "Test message"
             </code>
           </div>
         </PanelSectionRow>
@@ -127,7 +134,7 @@ export default definePlugin(() => {
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            logo: <SiHomeassistant size={24} color="#41BDF5" />,  // Same HA icon for all
+            logo: <SiHomeassistant size={24} color="#41BDF5" />,
           });
         });
       }
