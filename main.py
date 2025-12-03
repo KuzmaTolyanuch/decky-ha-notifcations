@@ -177,15 +177,24 @@ class Plugin:
             
             title = event_data.get("title", "Notification")
             message = event_data.get("message", "")
+            action = event_data.get("action")  # Optional action URL
             
             decky.logger.info(f"Received: {title} - {message}")
+            if action:
+                decky.logger.info(f"Action: {action}")
             
             import time
-            self.notification_queue.append({
+            notification = {
                 'title': title,
                 'message': message,
                 'timestamp': time.time()
-            })
+            }
+            
+            # Only add action if it exists
+            if action:
+                notification['action'] = action
+            
+            self.notification_queue.append(notification)
             
         except Exception as e:
             decky.logger.error(f"Error handling event: {e}")
@@ -197,6 +206,8 @@ class Plugin:
         
         if notifications:
             decky.logger.info(f"Returning {len(notifications)} notification(s)")
+            for notif in notifications:
+                decky.logger.info(f"  - {notif.get('title')}: action={notif.get('action', 'None')}")
         
         return notifications
 
