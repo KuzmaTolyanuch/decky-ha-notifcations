@@ -178,10 +178,16 @@ class Plugin:
             title = event_data.get("title", "Notification")
             message = event_data.get("message", "")
             action = event_data.get("action")  # Optional action URL
+            icon = event_data.get("icon") or event_data.get("logo")
+            icon_color = event_data.get("icon_color") or event_data.get("color")
             
             decky.logger.info(f"Received: {title} - {message}")
             if action:
                 decky.logger.info(f"Action: {action}")
+            if icon:
+                decky.logger.info(f"Icon: {icon}")
+            if icon_color:
+                decky.logger.info(f"Icon color: {icon_color}")
             
             import time
             notification = {
@@ -189,6 +195,11 @@ class Plugin:
                 'message': message,
                 'timestamp': time.time()
             }
+            
+            if icon:
+                notification['icon'] = icon
+            if icon_color:
+                notification['icon_color'] = icon_color
             
             # Only add action if it exists
             if action:

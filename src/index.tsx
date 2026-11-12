@@ -16,12 +16,16 @@ import {
 import { useState, useEffect } from "react";
 import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
 import { SiHomeassistant } from "react-icons/si";
+import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
   title: string;
   message: string;
   timestamp: number;
   action?: string;  // Optional action URL or command
+  icon?: string;    // Optional mdi:<icon_name> from Home Assistant
+  icon_color?: string; // Optional CSS color like "red" or "#41BDF5"
+  color?: string;   // Optional alias for compatibility
   entity_id?: string;  // Optional entity to control
 }
 
@@ -228,11 +232,18 @@ export default definePlugin(() => {
 
       if (notifications && notifications.length > 0) {
         notifications.forEach((notif: Notification) => {
+          const NotificationIcon = resolveNotificationIcon(notif.icon);
+          const iconColor = notif.icon_color || notif.color || "#41BDF5";
+
           toaster.toast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            logo: <SiHomeassistant size={32} color="#41BDF5" style={{ marginRight: "10px" }} />,
+            logo: NotificationIcon ? (
+              <NotificationIcon size={32} color={iconColor} style={{ marginRight: "10px" }} />
+            ) : (
+              <SiHomeassistant size={32} color={iconColor} style={{ marginRight: "10px" }} />
+            ),
             onClick: async () => {
               // Handle different action types
               if (notif.action) {
