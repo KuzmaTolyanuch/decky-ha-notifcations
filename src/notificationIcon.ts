@@ -1,10 +1,6 @@
 import * as MaterialIcons from 'react-icons/md';
-import * as MaterialDesignIcons from 'react-icons/mi';
 
-const ICON_LOOKUP = {
-  ...MaterialIcons,
-  ...MaterialDesignIcons,
-} as Record<string, unknown>;
+const ICON_LOOKUP = MaterialIcons as unknown as Record<string, unknown>;
 
 const toPascalCase = (value: string): string => {
   const cleaned = value
@@ -28,17 +24,6 @@ export const resolveNotificationIcon = (iconName?: string) => {
   }
 
   const baseName = trimmed.replace(/^mdi[:_-]/i, '');
-  const candidates = [
-    `Md${toPascalCase(baseName)}`,
-    `Mi${toPascalCase(baseName)}`,
-  ];
-
-  for (const candidate of candidates) {
-    const icon = ICON_LOOKUP[candidate];
-    if (icon) {
-      return icon as typeof MaterialIcons[keyof typeof MaterialIcons];
-    }
-  }
-
-  return null;
+  const icon = ICON_LOOKUP[`Md${toPascalCase(baseName)}`];
+  return icon ? icon as typeof MaterialIcons[keyof typeof MaterialIcons] : null;
 };
