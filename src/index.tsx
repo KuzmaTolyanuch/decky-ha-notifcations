@@ -206,6 +206,8 @@ const Content = () => {
               data:{'\n'}
               {'  '}title: "Alert"{'\n'}
               {'  '}message: "Test message"{'\n'}
+              {'  '}icon: "mdi:map-marker-question-outline"{'\n'}
+              {'  '}icon_color: "lightblue"{'\n'}
               {'\n'}
               # With action (opens URL){'\n'}
               event: steamdeck_notify{'\n'}
@@ -232,15 +234,24 @@ export default definePlugin(() => {
 
       if (notifications && notifications.length > 0) {
         notifications.forEach((notif: Notification) => {
-          const NotificationIcon = resolveNotificationIcon(notif.icon);
+          const iconPath = resolveNotificationIcon(notif.icon);
           const iconColor = notif.icon_color || notif.color || "#41BDF5";
 
           toaster.toast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            logo: NotificationIcon ? (
-              <NotificationIcon size={32} color={iconColor} style={{ marginRight: "10px" }} />
+            logo: iconPath ? (
+              <svg
+                width={32}
+                height={32}
+                viewBox="0 0 24 24"
+                color={iconColor}
+                style={{ marginRight: "10px", flexShrink: 0 }}
+                aria-hidden="true"
+              >
+                <path d={iconPath} fill="currentColor" />
+              </svg>
             ) : (
               <SiHomeassistant size={32} color={iconColor} style={{ marginRight: "10px" }} />
             ),

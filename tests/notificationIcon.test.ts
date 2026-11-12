@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 
 import { resolveNotificationIcon } from '../src/notificationIcon.ts';
 
-test('parses mdi icons from Home Assistant event payloads', () => {
-  const bellIcon = resolveNotificationIcon('mdi:bell');
-  const wifiIcon = resolveNotificationIcon('mdi:wifi');
+test('parses Home Assistant MDI icon names with hyphenated suffixes', () => {
+  const iconPath = resolveNotificationIcon('mdi:map-marker-question-outline');
 
-  assert.ok(bellIcon, 'mdi:bell should resolve to a valid icon component');
-  assert.ok(wifiIcon, 'mdi:wifi should resolve to a valid icon component');
+  assert.ok(iconPath, 'mdi:map-marker-question-outline should resolve');
+  assert.match(iconPath, /^M/);
 });
 
 test('falls back safely when the icon is missing or unknown', () => {
