@@ -234,7 +234,7 @@ export default definePlugin(() => {
 
       if (notifications && notifications.length > 0) {
         notifications.forEach((notif: Notification) => {
-          const iconPath = resolveNotificationIcon(notif.icon);
+          const iconPath = resolveNotificationIcon(notif.icon) ?? resolveNotificationIcon("mdi:home-assistant");
           const iconColor = notif.icon_color || notif.color || "#41BDF5";
 
           toaster.toast({
@@ -243,18 +243,16 @@ export default definePlugin(() => {
             duration: 8000,
             logo: iconPath ? (
               <svg
-                width={32}
-                height={32}
+                width={40}
+                height={40}
                 viewBox="0 0 24 24"
                 color={iconColor}
-                style={{ marginRight: "10px", flexShrink: 0 }}
+                style={{ flexShrink: 0 }}
                 aria-hidden="true"
               >
                 <path d={iconPath} fill="currentColor" />
               </svg>
-            ) : (
-              <SiHomeassistant size={32} color={iconColor} style={{ marginRight: "10px" }} />
-            ),
+            ) : null,
             onClick: async () => {
               // Handle different action types
               if (notif.action) {
