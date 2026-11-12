@@ -29,7 +29,7 @@ Receive Home Assistant notifications directly in Steam Deck Gaming Mode via WebS
 
 1. **Download the latest release:**
    ```bash
-   cd ~/homebrew/plugins
+   cd ~/
    git clone https://github.com/KuzmaTolyanuch/decky-ha-notifications.git ha-notify
    ```
 
@@ -48,19 +48,23 @@ Receive Home Assistant notifications directly in Steam Deck Gaming Mode via WebS
    # Edit with your values
    nano .env
    ```
-   
    Add your Home Assistant details:
    ```bash
    HA_URL=https://your-instance.ui.nabu.casa
    HA_TOKEN=your_long_lived_access_token
    ```
 
-4. **Restart Decky Loader:**
+4. **Move buit plugin:**
+   ```bash
+   mv ~/ha-notify ~/homebrew/plugins
+   ```
+
+5. **Restart Decky Loader:**
    ```bash
    systemctl --user restart plugin_loader
    ```
 
-5. **Verify installation:**
+6. **Verify installation:**
    - Open Quick Access Menu (`...` button)
    - Navigate to Decky tab (plug icon 🔌)
    - Look for "HA Notify" plugin
@@ -115,7 +119,11 @@ event: steamdeck_notify
 event_data:
   title: "Notification Title"
   message: "Notification message"
+  icon: "mdi:home-assistant"
+  icon_color: "lightblue"
 ```
+
+`icon` accepts Home Assistant's `mdi:<icon-name>` format. `icon_color` accepts a CSS color name or value; `color` is also accepted as an alias. For example, `icon: "mdi:map-marker-question-outline"` with `icon_color: "lightblue"` uses the full Material Design Icons set. If `icon` is omitted or unrecognized, the toast uses `mdi:home-assistant`; the default icon color is `#41BDF5`.
 
 #### Notification with Action (Click to Open URL)
 

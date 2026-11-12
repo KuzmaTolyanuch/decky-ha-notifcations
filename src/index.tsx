@@ -15,13 +15,16 @@ import {
 
 import { useState, useEffect } from "react";
 import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
-import { SiHomeassistant } from "react-icons/si";
+import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
   title: string;
   message: string;
   timestamp: number;
   action?: string;  // Optional action URL or command
+  icon?: string;    // Optional mdi:<icon_name> from Home Assistant
+  icon_color?: string; // Optional CSS color like "red" or "#41BDF5"
+  color?: string;   // Optional alias for compatibility
   entity_id?: string;  // Optional entity to control
 }
 
@@ -63,11 +66,24 @@ const Content = () => {
   };
 
   const testNotification = () => {
+    const iconPath = resolveNotificationIcon("mdi:home-assistant");
+
     toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
-      logo: <SiHomeassistant size={32} color="#41BDF5" style={{ marginRight: "10px" }} />,
+      logo: iconPath ? (
+        <svg
+          width={40}
+          height={40}
+          viewBox="0 0 24 24"
+          color="#41BDF5"
+          style={{ flexShrink: 0 }}
+          aria-hidden="true"
+        >
+          <path d={iconPath} fill="currentColor" />
+        </svg>
+      ) : null,
       onClick: async () => {
         // Open dashboard when clicking test notification
         const url = await getDashboardUrl();
@@ -104,11 +120,24 @@ const Content = () => {
     setTesting(true);
     try {
       const result = await verifyConnection();
+      const iconPath = resolveNotificationIcon("mdi:home-assistant");
+
       toaster.toast({
         title: result.connected ? "Connected" : "Connection Failed",
         body: result.message,
         duration: 5000,
-        logo: <SiHomeassistant size={32} color={result.connected ? "#4caf50" : "#f44336"} style={{ marginRight: "8px" }} />,
+        logo: iconPath ? (
+          <svg
+            width={40}
+            height={40}
+            viewBox="0 0 24 24"
+            color={result.connected ? "#4caf50" : "#f44336"}
+            style={{ flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            <path d={iconPath} fill="currentColor" />
+          </svg>
+        ) : null,
       });
     } catch (error) {
       toaster.toast({
@@ -202,6 +231,8 @@ const Content = () => {
               data:{'\n'}
               {'  '}title: "Alert"{'\n'}
               {'  '}message: "Test message"{'\n'}
+              {'  '}icon: "mdi:map-marker-question-outline"{'\n'}
+              {'  '}icon_color: "lightblue"{'\n'}
               {'\n'}
               # With action (opens URL){'\n'}
               event: steamdeck_notify{'\n'}
@@ -228,11 +259,25 @@ export default definePlugin(() => {
 
       if (notifications && notifications.length > 0) {
         notifications.forEach((notif: Notification) => {
+          const iconPath = resolveNotificationIcon(notif.icon) ?? resolveNotificationIcon("mdi:home-assistant");
+          const iconColor = notif.icon_color || notif.color || "#41BDF5";
+
           toaster.toast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
-            logo: <SiHomeassistant size={32} color="#41BDF5" style={{ marginRight: "10px" }} />,
+            logo: iconPath ? (
+              <svg
+                width={40}
+                height={40}
+                viewBox="0 0 24 24"
+                color={iconColor}
+                style={{ flexShrink: 0 }}
+                aria-hidden="true"
+              >
+                <path d={iconPath} fill="currentColor" />
+              </svg>
+            ) : null,
             onClick: async () => {
               // Handle different action types
               if (notif.action) {
