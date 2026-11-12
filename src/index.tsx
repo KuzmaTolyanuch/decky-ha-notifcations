@@ -15,7 +15,6 @@ import {
 
 import { useState, useEffect } from "react";
 import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
-import { SiHomeassistant } from "react-icons/si";
 import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
@@ -67,11 +66,24 @@ const Content = () => {
   };
 
   const testNotification = () => {
+    const iconPath = resolveNotificationIcon("mdi:home-assistant");
+
     toaster.toast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
-      logo: <SiHomeassistant size={32} color="#41BDF5" style={{ marginRight: "10px" }} />,
+      logo: iconPath ? (
+        <svg
+          width={40}
+          height={40}
+          viewBox="0 0 24 24"
+          color="#41BDF5"
+          style={{ flexShrink: 0 }}
+          aria-hidden="true"
+        >
+          <path d={iconPath} fill="currentColor" />
+        </svg>
+      ) : null,
       onClick: async () => {
         // Open dashboard when clicking test notification
         const url = await getDashboardUrl();
@@ -108,11 +120,24 @@ const Content = () => {
     setTesting(true);
     try {
       const result = await verifyConnection();
+      const iconPath = resolveNotificationIcon("mdi:home-assistant");
+
       toaster.toast({
         title: result.connected ? "Connected" : "Connection Failed",
         body: result.message,
         duration: 5000,
-        logo: <SiHomeassistant size={32} color={result.connected ? "#4caf50" : "#f44336"} style={{ marginRight: "8px" }} />,
+        logo: iconPath ? (
+          <svg
+            width={40}
+            height={40}
+            viewBox="0 0 24 24"
+            color={result.connected ? "#4caf50" : "#f44336"}
+            style={{ flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            <path d={iconPath} fill="currentColor" />
+          </svg>
+        ) : null,
       });
     } catch (error) {
       toaster.toast({

@@ -119,11 +119,11 @@ event: steamdeck_notify
 event_data:
   title: "Notification Title"
   message: "Notification message"
-  icon: "mdi:map-marker-question-outline"
+  icon: "mdi:home-assistant"
   icon_color: "lightblue"
 ```
 
-`icon` accepts Home Assistant's `mdi:<icon-name>` format, and `icon_color` accepts a CSS color name or value. If omitted or unknown, the toast uses the default Home Assistant logo and blue color.
+`icon` accepts Home Assistant's `mdi:<icon-name>` format. `icon_color` accepts a CSS color name or value; `color` is also accepted as an alias. For example, `icon: "mdi:map-marker-question-outline"` with `icon_color: "lightblue"` uses the full Material Design Icons set. If `icon` is omitted or unrecognized, the toast uses `mdi:home-assistant`; the default icon color is `#41BDF5`.
 
 #### Notification with Action (Click to Open URL)
 
