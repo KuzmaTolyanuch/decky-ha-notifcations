@@ -53,6 +53,7 @@ const activeToastHandles = new Map<ToastHandle, number>();
 
 interface DashboardBrowserView {
   EnableSteamInput(): void;
+  LoadURL(url: string): void;
   SetBounds(x: number, y: number, width: number, height: number): void;
   SetWindowStackingOrder(order: number): void;
   SetVisible(visible: boolean): void;
@@ -61,7 +62,10 @@ interface DashboardBrowserView {
 
 interface SteamBrowserApi {
   BrowserView: {
-    Create(options?: { strInitialURL?: string }): DashboardBrowserView;
+    CreatePopup(options?: { strInitialURL?: string }): {
+      strCreateURL: string;
+      browserView: DashboardBrowserView;
+    };
     Destroy(browserView: DashboardBrowserView): void;
   };
   Window: {
@@ -82,9 +86,8 @@ const getSteamBrowserApi = (): SteamBrowserApi => {
   return steamClient;
 };
 
-type DashboardBrowserViewHandle = ReturnType<SteamBrowserApi["BrowserView"]["Create"]>;
-
-let dashboardBrowserView: DashboardBrowserViewHandle | null = null;
+let dashboardBrowserView: DashboardBrowserView | null = null;
+let dashboardPopupWindow: Window | null = null;
 
 const showTrackedToast = (toastData: Parameters<typeof toaster.toast>[0]) => {
   const expiration = typeof toastData.expiration === "number" && Number.isFinite(toastData.expiration) && toastData.expiration > 0
@@ -356,20 +359,29 @@ export default definePlugin(() => {
       }
       dashboardBrowserView = null;
     }
+    dashboardPopupWindow?.close();
+    dashboardPopupWindow = null;
   };
 
   const openFullscreenDashboard = async () => {
     try {
+      closeFullscreenDashboard();
+      const steamClient = getSteamBrowserApi();
+      const { strCreateURL, browserView } = steamClient.BrowserView.CreatePopup({
+        strInitialURL: "about:blank",
+      });
+      dashboardBrowserView = browserView;
+      const popupWindow = window.open(strCreateURL, "_blank");
+      if (!popupWindow) {
+        throw new Error("Steam blocked the fullscreen browser popup");
+      }
+      dashboardPopupWindow = popupWindow;
+
       const url = await getDashboardUrl();
       if (!url) {
         throw new Error("Failed to get dashboard URL");
       }
-
-      closeFullscreenDashboard();
-      const steamClient = getSteamBrowserApi();
       const monitor = await steamClient.Window.GetDefaultMonitorDimensions();
-      const browserView = steamClient.BrowserView.Create({ strInitialURL: url });
-      dashboardBrowserView = browserView;
       browserView.SetBounds(
         monitor.nFullLeft,
         monitor.nFullTop,
@@ -379,15 +391,16 @@ export default definePlugin(() => {
       browserView.SetWindowStackingOrder(1); // Steam's EWindowStackingOrder.Top
       browserView.SetVisible(true);
       browserView.EnableSteamInput();
+      browserView.LoadURL(url);
       browserView.SetFocus(true);
       return true;
     } catch (error) {
       closeFullscreenDashboard();
       console.error("Failed to open fullscreen dashboard:", error);
       showTrackedToast({
-        title: "Fullscreen browser unavailable",
-        body: "Use Open Dashboard to open HA in Steam's standard browser.",
-        duration: 6000,
+        title: "Fullscreen dashboard failed",
+        body: error instanceof Error ? error.message : String(error),
+        duration: 8000,
       });
       return false;
     }
