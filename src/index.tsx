@@ -15,7 +15,7 @@ import {
 } from "@decky/api";
 
 import { useState, useEffect, useRef } from "react";
-import { FaBell, FaSync } from "react-icons/fa";
+import { FaSync } from "react-icons/fa";
 import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
@@ -168,7 +168,7 @@ const Content = ({
 
     showTrackedToast({
       title: "Test Notification",
-      body: "This is a test from HA Notify!",
+      body: "This is a test from Home Assistant!",
       duration: 5000,
       logo: iconPath ? (
         <svg
@@ -323,7 +323,7 @@ const Content = ({
 };
 
 export default definePlugin(() => {
-  console.log("HA Notify initializing");
+  console.log("Home Assistant plugin initializing");
 
   let pollInterval: number | undefined;
 
@@ -474,10 +474,11 @@ export default definePlugin(() => {
   };
 
   pollInterval = window.setInterval(checkForNotifications, 1000);
+  const homeAssistantIcon = resolveNotificationIcon("mdi:home-assistant");
 
   return {
-    name: "HA Notify",
-    titleView: <div className={staticClasses.Title}>HA Notify</div>,
+    name: "Home Assistant",
+    titleView: <div className={staticClasses.Title}>Home Assistant</div>,
     content: (
       <Content
         onDismissAll={dismissAllPluginToasts}
@@ -485,10 +486,14 @@ export default definePlugin(() => {
         onCloseFullscreenDashboard={closeFullscreenDashboard}
       />
     ),
-    icon: <FaBell />,
+    icon: homeAssistantIcon ? (
+      <svg width={24} height={24} viewBox="0 0 24 24" aria-hidden="true">
+        <path d={homeAssistantIcon} fill="currentColor" />
+      </svg>
+    ) : <FaSync />,
     alwaysRender: true,
     onDismount() {
-      console.log("HA Notify unloading");
+      console.log("Home Assistant plugin unloading");
       if (pollInterval) {
         clearInterval(pollInterval);
       }
