@@ -14,7 +14,7 @@ import {
   useQuickAccessVisible
 } from "@decky/api";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
 import { resolveNotificationIcon } from "./notificationIcon";
 
@@ -132,6 +132,7 @@ const Content = ({
   const [testing, setTesting] = useState(false);
   const [fullscreenDashboardOpen, setFullscreenDashboardOpen] = useState(false);
   const isQuickAccessVisible = useQuickAccessVisible();
+  const wasQuickAccessVisible = useRef(isQuickAccessVisible);
 
   useEffect(() => {
     loadStats();
@@ -140,7 +141,10 @@ const Content = ({
   }, []);
 
   useEffect(() => {
-    if (isQuickAccessVisible && fullscreenDashboardOpen) {
+    const justOpenedQuickAccess = isQuickAccessVisible && !wasQuickAccessVisible.current;
+    wasQuickAccessVisible.current = isQuickAccessVisible;
+
+    if (justOpenedQuickAccess && fullscreenDashboardOpen) {
       onCloseFullscreenDashboard();
       setFullscreenDashboardOpen(false);
     }
