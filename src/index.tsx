@@ -54,6 +54,7 @@ const activeToastHandles = new Map<ToastHandle, number>();
 interface DashboardBrowserView {
   CanGoBackward(): boolean;
   EnableSteamInput(): void;
+  ReplaceURL(url: string): void;
   SetBounds(x: number, y: number, width: number, height: number): void;
   SetWindowStackingOrder(order: number): void;
   SetVisible(visible: boolean): void;
@@ -381,13 +382,8 @@ export default definePlugin(() => {
     try {
       closeFullscreenDashboard();
       const steamClient = getSteamBrowserApi();
-      const url = await getDashboardUrl();
-      if (!url) {
-        throw new Error("Failed to get dashboard URL");
-      }
-
       const { strCreateURL, browserView } = steamClient.BrowserView.CreatePopup({
-        strInitialURL: url,
+        strInitialURL: "about:blank",
       });
       dashboardBrowserView = browserView;
       const popupWindow = window.open(strCreateURL, "_blank");
@@ -395,6 +391,9 @@ export default definePlugin(() => {
         throw new Error("Steam blocked the fullscreen browser popup");
       }
       dashboardPopupWindow = popupWindow;
+
+      // Open the Steam popup synchronously from the button click to avoid popup
+      // blocking, then replace about:blank after fetching HA's URL.
       steamClient.Input.SetWebBrowserActionset(true);
       const controllerInputRegistration = steamClient.Input.RegisterForControllerInputMessages(
         (_controllerIndex, gamepadButton, isButtonPressed) => {
@@ -407,6 +406,10 @@ export default definePlugin(() => {
       );
       unregisterControllerInput = () => controllerInputRegistration.unregister();
 
+      const url = await getDashboardUrl();
+      if (!url) {
+        throw new Error("Failed to get dashboard URL");
+      }
       const monitor = await steamClient.Window.GetDefaultMonitorDimensions();
       browserView.SetBounds(
         monitor.nFullLeft,
@@ -417,6 +420,7 @@ export default definePlugin(() => {
       browserView.SetWindowStackingOrder(1); // Steam's EWindowStackingOrder.Top
       browserView.SetVisible(true);
       browserView.EnableSteamInput();
+      browserView.ReplaceURL(url);
       browserView.SetFocus(true);
       return true;
     } catch (error) {
