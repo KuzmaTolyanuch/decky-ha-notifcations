@@ -4,7 +4,8 @@ import {
   PanelSectionRow,
   staticClasses,
   Focusable,
-  Navigation
+  Navigation,
+  EWindowStackingOrder
 } from "@decky/ui";
 
 import {
@@ -51,6 +52,41 @@ type ToastHandle = ReturnType<typeof toaster.toast>;
 
 const activeToastHandles = new Map<ToastHandle, number>();
 
+interface DashboardBrowserView {
+  EnableSteamInput(): void;
+  SetBounds(x: number, y: number, width: number, height: number): void;
+  SetWindowStackingOrder(order: EWindowStackingOrder): void;
+  SetVisible(visible: boolean): void;
+  SetFocus(focused: boolean): void;
+}
+
+interface SteamBrowserApi {
+  BrowserView: {
+    Create(options?: { strInitialURL?: string }): DashboardBrowserView;
+    Destroy(browserView: DashboardBrowserView): void;
+  };
+  Window: {
+    GetDefaultMonitorDimensions(): Promise<{
+      nFullLeft: number;
+      nFullTop: number;
+      nFullWidth: number;
+      nFullHeight: number;
+    }>;
+  };
+}
+
+const getSteamBrowserApi = (): SteamBrowserApi => {
+  const steamClient = (window as unknown as { SteamClient?: SteamBrowserApi }).SteamClient;
+  if (!steamClient?.BrowserView || !steamClient?.Window) {
+    throw new Error("Steam BrowserView API is unavailable");
+  }
+  return steamClient;
+};
+
+type DashboardBrowserViewHandle = ReturnType<SteamBrowserApi["BrowserView"]["Create"]>;
+
+let dashboardBrowserView: DashboardBrowserViewHandle | null = null;
+
 const showTrackedToast = (toastData: Parameters<typeof toaster.toast>[0]) => {
   const expiration = typeof toastData.expiration === "number" && Number.isFinite(toastData.expiration) && toastData.expiration > 0
     ? toastData.expiration
@@ -72,9 +108,18 @@ const dismissAllPluginToasts = () => {
 };
 
 // Main content component
-const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
+const Content = ({
+  onDismissAll,
+  onOpenFullscreenDashboard,
+  onCloseFullscreenDashboard,
+}: {
+  onDismissAll: () => void;
+  onOpenFullscreenDashboard: () => Promise<boolean>;
+  onCloseFullscreenDashboard: () => void;
+}) => {
   const [stats, setStats] = useState<PluginStats | null>(null);
   const [testing, setTesting] = useState(false);
+  const [fullscreenDashboardOpen, setFullscreenDashboardOpen] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -89,6 +134,15 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
     } catch (error) {
       console.error("Failed to load stats:", error);
     }
+  };
+
+  const openFullscreenDashboard = async () => {
+    setFullscreenDashboardOpen(await onOpenFullscreenDashboard());
+  };
+
+  const closeFullscreenDashboard = () => {
+    onCloseFullscreenDashboard();
+    setFullscreenDashboardOpen(false);
   };
 
   const testNotification = () => {
@@ -214,9 +268,20 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
+          <ButtonItem layout="below" onClick={openFullscreenDashboard}>
+            Open Dashboard Fullscreen (Experimental)
+          </ButtonItem>
+        </PanelSectionRow>
+        {fullscreenDashboardOpen && (
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={closeFullscreenDashboard}>
+              Close Fullscreen Dashboard
+            </ButtonItem>
+          </PanelSectionRow>
+        )}
+        <PanelSectionRow>
           <div style={{ fontSize: "10px", opacity: 0.6, lineHeight: "1.3" }}>
-            Opens in Steam browser. Use right trackpad as mouse.
-            Press Steam button → X to close.
+            Fullscreen mode hides Steam's browser toolbar. Press the Steam button to reopen Decky, then choose Close Fullscreen Dashboard.
           </div>
         </PanelSectionRow>
       </PanelSection>
@@ -281,6 +346,53 @@ export default definePlugin(() => {
   console.log("HA Notify initializing");
 
   let pollInterval: number | undefined;
+
+  const closeFullscreenDashboard = () => {
+    if (dashboardBrowserView) {
+      try {
+        getSteamBrowserApi().BrowserView.Destroy(dashboardBrowserView);
+      } catch (error) {
+        console.error("Failed to close fullscreen dashboard browser:", error);
+        dashboardBrowserView.SetVisible(false);
+      }
+      dashboardBrowserView = null;
+    }
+  };
+
+  const openFullscreenDashboard = async () => {
+    try {
+      const url = await getDashboardUrl();
+      if (!url) {
+        throw new Error("Failed to get dashboard URL");
+      }
+
+      closeFullscreenDashboard();
+      const steamClient = getSteamBrowserApi();
+      const monitor = await steamClient.Window.GetDefaultMonitorDimensions();
+      const browserView = steamClient.BrowserView.Create({ strInitialURL: url });
+      dashboardBrowserView = browserView;
+      browserView.SetBounds(
+        monitor.nFullLeft,
+        monitor.nFullTop,
+        monitor.nFullWidth,
+        monitor.nFullHeight,
+      );
+      browserView.SetWindowStackingOrder(EWindowStackingOrder.Top);
+      browserView.SetVisible(true);
+      browserView.EnableSteamInput();
+      browserView.SetFocus(true);
+      return true;
+    } catch (error) {
+      closeFullscreenDashboard();
+      console.error("Failed to open fullscreen dashboard:", error);
+      showTrackedToast({
+        title: "Fullscreen browser unavailable",
+        body: "Use Open Dashboard to open HA in Steam's standard browser.",
+        duration: 6000,
+      });
+      return false;
+    }
+  };
 
   const checkForNotifications = async () => {
     try {
@@ -355,7 +467,13 @@ export default definePlugin(() => {
   return {
     name: "HA Notify",
     titleView: <div className={staticClasses.Title}>HA Notify</div>,
-    content: <Content onDismissAll={dismissAllPluginToasts} />,
+    content: (
+      <Content
+        onDismissAll={dismissAllPluginToasts}
+        onOpenFullscreenDashboard={openFullscreenDashboard}
+        onCloseFullscreenDashboard={closeFullscreenDashboard}
+      />
+    ),
     icon: <FaBell />,
     alwaysRender: true,
     onDismount() {
@@ -363,6 +481,7 @@ export default definePlugin(() => {
       if (pollInterval) {
         clearInterval(pollInterval);
       }
+      closeFullscreenDashboard();
       dismissAllPluginToasts();
     },
   };
