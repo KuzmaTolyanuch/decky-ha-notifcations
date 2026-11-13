@@ -52,8 +52,8 @@ type ToastHandle = ReturnType<typeof toaster.toast>;
 const activeToastHandles = new Map<ToastHandle, number>();
 
 interface DashboardBrowserView {
+  CanGoBackward(): boolean;
   EnableSteamInput(): void;
-  LoadURL(url: string): void;
   SetBounds(x: number, y: number, width: number, height: number): void;
   SetWindowStackingOrder(order: number): void;
   SetVisible(visible: boolean): void;
@@ -76,11 +76,17 @@ interface SteamBrowserApi {
       nFullHeight: number;
     }>;
   };
+  Input: {
+    RegisterForControllerInputMessages(
+      callback: (controllerIndex: number, gamepadButton: number, isButtonPressed: boolean) => void,
+    ): { unregister(): void };
+    SetWebBrowserActionset(enabled: boolean): void;
+  };
 }
 
 const getSteamBrowserApi = (): SteamBrowserApi => {
   const steamClient = (window as unknown as { SteamClient?: SteamBrowserApi }).SteamClient;
-  if (!steamClient?.BrowserView || !steamClient?.Window) {
+  if (!steamClient?.BrowserView || !steamClient?.Window || !steamClient?.Input) {
     throw new Error("Steam BrowserView API is unavailable");
   }
   return steamClient;
@@ -88,6 +94,7 @@ const getSteamBrowserApi = (): SteamBrowserApi => {
 
 let dashboardBrowserView: DashboardBrowserView | null = null;
 let dashboardPopupWindow: Window | null = null;
+let unregisterControllerInput: (() => void) | null = null;
 
 const showTrackedToast = (toastData: Parameters<typeof toaster.toast>[0]) => {
   const expiration = typeof toastData.expiration === "number" && Number.isFinite(toastData.expiration) && toastData.expiration > 0
@@ -283,7 +290,7 @@ const Content = ({
         )}
         <PanelSectionRow>
           <div style={{ fontSize: "10px", opacity: 0.6, lineHeight: "1.3" }}>
-            Fullscreen mode hides Steam's browser toolbar. Press the Steam button to reopen Decky, then choose Close Fullscreen Dashboard.
+            D-pad or left stick navigates; A selects. B goes back, or closes the dashboard when there is no previous page. The Steam button opens Decky controls.
           </div>
         </PanelSectionRow>
       </PanelSection>
@@ -350,6 +357,8 @@ export default definePlugin(() => {
   let pollInterval: number | undefined;
 
   const closeFullscreenDashboard = () => {
+    unregisterControllerInput?.();
+    unregisterControllerInput = null;
     if (dashboardBrowserView) {
       try {
         getSteamBrowserApi().BrowserView.Destroy(dashboardBrowserView);
@@ -361,14 +370,24 @@ export default definePlugin(() => {
     }
     dashboardPopupWindow?.close();
     dashboardPopupWindow = null;
+    try {
+      getSteamBrowserApi().Input.SetWebBrowserActionset(false);
+    } catch (error) {
+      console.warn("Failed to restore Steam controller action set:", error);
+    }
   };
 
   const openFullscreenDashboard = async () => {
     try {
       closeFullscreenDashboard();
       const steamClient = getSteamBrowserApi();
+      const url = await getDashboardUrl();
+      if (!url) {
+        throw new Error("Failed to get dashboard URL");
+      }
+
       const { strCreateURL, browserView } = steamClient.BrowserView.CreatePopup({
-        strInitialURL: "about:blank",
+        strInitialURL: url,
       });
       dashboardBrowserView = browserView;
       const popupWindow = window.open(strCreateURL, "_blank");
@@ -376,11 +395,18 @@ export default definePlugin(() => {
         throw new Error("Steam blocked the fullscreen browser popup");
       }
       dashboardPopupWindow = popupWindow;
+      steamClient.Input.SetWebBrowserActionset(true);
+      const controllerInputRegistration = steamClient.Input.RegisterForControllerInputMessages(
+        (_controllerIndex, gamepadButton, isButtonPressed) => {
+          // Steam Input's Web Browser action set handles D-pad, stick, A and
+          // normal browser Back. B closes the popup when there is no history.
+          if (isButtonPressed && gamepadButton === 1 && dashboardBrowserView && !dashboardBrowserView.CanGoBackward()) {
+            closeFullscreenDashboard();
+          }
+        },
+      );
+      unregisterControllerInput = () => controllerInputRegistration.unregister();
 
-      const url = await getDashboardUrl();
-      if (!url) {
-        throw new Error("Failed to get dashboard URL");
-      }
       const monitor = await steamClient.Window.GetDefaultMonitorDimensions();
       browserView.SetBounds(
         monitor.nFullLeft,
@@ -391,7 +417,6 @@ export default definePlugin(() => {
       browserView.SetWindowStackingOrder(1); // Steam's EWindowStackingOrder.Top
       browserView.SetVisible(true);
       browserView.EnableSteamInput();
-      browserView.LoadURL(url);
       browserView.SetFocus(true);
       return true;
     } catch (error) {
