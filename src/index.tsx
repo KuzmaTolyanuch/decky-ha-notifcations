@@ -10,7 +10,8 @@ import {
 import {
   callable,
   definePlugin,
-  toaster
+  toaster,
+  useQuickAccessVisible
 } from "@decky/api";
 
 import { useState, useEffect } from "react";
@@ -130,12 +131,20 @@ const Content = ({
   const [stats, setStats] = useState<PluginStats | null>(null);
   const [testing, setTesting] = useState(false);
   const [fullscreenDashboardOpen, setFullscreenDashboardOpen] = useState(false);
+  const isQuickAccessVisible = useQuickAccessVisible();
 
   useEffect(() => {
     loadStats();
     const interval = setInterval(loadStats, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (isQuickAccessVisible && fullscreenDashboardOpen) {
+      onCloseFullscreenDashboard();
+      setFullscreenDashboardOpen(false);
+    }
+  }, [isQuickAccessVisible, fullscreenDashboardOpen, onCloseFullscreenDashboard]);
 
   const loadStats = async () => {
     try {
@@ -282,16 +291,14 @@ const Content = ({
             Open Dashboard Fullscreen (Experimental)
           </ButtonItem>
         </PanelSectionRow>
-        {fullscreenDashboardOpen && (
-          <PanelSectionRow>
-            <ButtonItem layout="below" onClick={closeFullscreenDashboard}>
-              Close Fullscreen Dashboard
-            </ButtonItem>
-          </PanelSectionRow>
-        )}
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={closeFullscreenDashboard}>
+            Close Fullscreen Dashboard
+          </ButtonItem>
+        </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ fontSize: "10px", opacity: 0.6, lineHeight: "1.3" }}>
-            D-pad or left stick navigates; A selects. B goes back, or closes the dashboard when there is no previous page. The Steam button opens Decky controls.
+            D-pad or left stick navigates; A selects. B goes back, or closes the dashboard when there is no previous page. Opening Quick Access also closes it.
           </div>
         </PanelSectionRow>
       </PanelSection>
