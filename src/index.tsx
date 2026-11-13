@@ -15,7 +15,7 @@ import {
 } from "@decky/api";
 
 import { useState, useEffect, useRef } from "react";
-import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
+import { FaBell, FaSync } from "react-icons/fa";
 import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
@@ -163,11 +163,6 @@ const Content = ({
     setFullscreenDashboardOpen(await onOpenFullscreenDashboard());
   };
 
-  const closeFullscreenDashboard = () => {
-    onCloseFullscreenDashboard();
-    setFullscreenDashboardOpen(false);
-  };
-
   const testNotification = () => {
     const iconPath = resolveNotificationIcon("mdi:home-assistant");
 
@@ -195,28 +190,6 @@ const Content = ({
         }
       }
     });
-  };
-
-  const openDashboard = async () => {
-    try {
-      const url = await getDashboardUrl();
-      if (url) {
-        Navigation.NavigateToExternalWeb(url);
-      } else {
-        showTrackedToast({
-          title: "Error",
-          body: "Failed to get dashboard URL",
-          duration: 5000,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to open dashboard:", error);
-      showTrackedToast({
-        title: "Error",
-        body: "Failed to open dashboard",
-        duration: 5000,
-      });
-    }
   };
 
   const testConnection = async () => {
@@ -282,22 +255,8 @@ const Content = ({
 
       <PanelSection title="Dashboard">
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={openDashboard}
-            icon={<FaExternalLinkAlt />}
-          >
-            Open Dashboard
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
           <ButtonItem layout="below" onClick={openFullscreenDashboard}>
-            Open Dashboard Fullscreen (Experimental)
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={closeFullscreenDashboard}>
-            Close Fullscreen Dashboard
+            Open Dashboard
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
