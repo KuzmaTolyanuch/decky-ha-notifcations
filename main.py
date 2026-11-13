@@ -174,12 +174,23 @@ class Plugin:
         try:
             event = data.get("event", {})
             event_data = event.get("data", {})
+            import time
+
+            command = event_data.get("command")
+            if command == "dismiss_all":
+                self.notification_queue.append({
+                    'command': command,
+                    'timestamp': time.time()
+                })
+                decky.logger.info("Received command to dismiss all plugin notifications")
+                return
             
             title = event_data.get("title", "Notification")
             message = event_data.get("message", "")
             action = event_data.get("action")  # Optional action URL
             icon = event_data.get("icon") or event_data.get("logo")
             icon_color = event_data.get("icon_color") or event_data.get("color")
+            expiration = event_data.get("expiration")
             
             decky.logger.info(f"Received: {title} - {message}")
             if action:
@@ -189,7 +200,6 @@ class Plugin:
             if icon_color:
                 decky.logger.info(f"Icon color: {icon_color}")
             
-            import time
             notification = {
                 'title': title,
                 'message': message,
@@ -200,6 +210,8 @@ class Plugin:
                 notification['icon'] = icon
             if icon_color:
                 notification['icon_color'] = icon_color
+            if isinstance(expiration, (int, float)) and not isinstance(expiration, bool) and expiration > 0:
+                notification['expiration'] = expiration
             
             # Only add action if it exists
             if action:

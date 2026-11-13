@@ -21,6 +21,8 @@ interface Notification {
   title: string;
   message: string;
   timestamp: number;
+  command?: string;
+  expiration?: number; // Milliseconds before removal from the Steam notification tray
   action?: string;  // Optional action URL or command
   icon?: string;    // Optional mdi:<icon_name> from Home Assistant
   icon_color?: string; // Optional CSS color like "red" or "#41BDF5"
@@ -44,9 +46,33 @@ const getStats = callable<[], PluginStats>("get_stats");
 const getPendingNotifications = callable<[], Notification[]>("get_pending_notifications");
 const getDashboardUrl = callable<[], string | null>("get_dashboard_url");
 const verifyConnection = callable<[], ConnectionStatus>("verify_connection");
+const DEFAULT_TOAST_EXPIRATION_MS = 24 * 60 * 60 * 1000;
+type ToastHandle = ReturnType<typeof toaster.toast>;
+
+const activeToastHandles = new Map<ToastHandle, number>();
+
+const showTrackedToast = (toastData: Parameters<typeof toaster.toast>[0]) => {
+  const expiration = typeof toastData.expiration === "number" && Number.isFinite(toastData.expiration) && toastData.expiration > 0
+    ? toastData.expiration
+    : DEFAULT_TOAST_EXPIRATION_MS;
+  const toastHandle = toaster.toast({ ...toastData, expiration });
+  const cleanupTimer = window.setTimeout(() => {
+    activeToastHandles.delete(toastHandle);
+  }, expiration);
+  activeToastHandles.set(toastHandle, cleanupTimer);
+  return toastHandle;
+};
+
+const dismissAllPluginToasts = () => {
+  activeToastHandles.forEach((timer, toastHandle) => {
+    window.clearTimeout(timer);
+    toastHandle.dismiss();
+  });
+  activeToastHandles.clear();
+};
 
 // Main content component
-const Content = () => {
+const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
   const [stats, setStats] = useState<PluginStats | null>(null);
   const [testing, setTesting] = useState(false);
 
@@ -68,7 +94,7 @@ const Content = () => {
   const testNotification = () => {
     const iconPath = resolveNotificationIcon("mdi:home-assistant");
 
-    toaster.toast({
+    showTrackedToast({
       title: "Test Notification",
       body: "This is a test from HA Notify!",
       duration: 5000,
@@ -100,7 +126,7 @@ const Content = () => {
       if (url) {
         Navigation.NavigateToExternalWeb(url);
       } else {
-        toaster.toast({
+        showTrackedToast({
           title: "Error",
           body: "Failed to get dashboard URL",
           duration: 5000,
@@ -108,7 +134,7 @@ const Content = () => {
       }
     } catch (error) {
       console.error("Failed to open dashboard:", error);
-      toaster.toast({
+      showTrackedToast({
         title: "Error",
         body: "Failed to open dashboard",
         duration: 5000,
@@ -122,7 +148,7 @@ const Content = () => {
       const result = await verifyConnection();
       const iconPath = resolveNotificationIcon("mdi:home-assistant");
 
-      toaster.toast({
+      showTrackedToast({
         title: result.connected ? "Connected" : "Connection Failed",
         body: result.message,
         duration: 5000,
@@ -140,7 +166,7 @@ const Content = () => {
         ) : null,
       });
     } catch (error) {
-      toaster.toast({
+      showTrackedToast({
         title: "Error",
         body: "Failed to test connection",
         duration: 5000,
@@ -209,6 +235,9 @@ const Content = () => {
             >
               {testing ? "Testing..." : "Test Connection"}
             </ButtonItem>
+            <ButtonItem layout="below" onClick={onDismissAll}>
+              Dismiss All Notifications
+            </ButtonItem>
           </Focusable>
         </PanelSectionRow>
       </PanelSection>
@@ -259,13 +288,21 @@ export default definePlugin(() => {
 
       if (notifications && notifications.length > 0) {
         notifications.forEach((notif: Notification) => {
+          if (notif.command === "dismiss_all") {
+            dismissAllPluginToasts();
+            return;
+          }
+
           const iconPath = resolveNotificationIcon(notif.icon) ?? resolveNotificationIcon("mdi:home-assistant");
           const iconColor = notif.icon_color || notif.color || "#41BDF5";
-
-          toaster.toast({
+          const expiration = typeof notif.expiration === "number" && Number.isFinite(notif.expiration) && notif.expiration > 0
+            ? notif.expiration
+            : DEFAULT_TOAST_EXPIRATION_MS;
+          showTrackedToast({
             title: notif.title,
             body: notif.message,
             duration: 8000,
+            expiration,
             logo: iconPath ? (
               <svg
                 width={40}
@@ -318,7 +355,7 @@ export default definePlugin(() => {
   return {
     name: "HA Notify",
     titleView: <div className={staticClasses.Title}>HA Notify</div>,
-    content: <Content />,
+    content: <Content onDismissAll={dismissAllPluginToasts} />,
     icon: <FaBell />,
     alwaysRender: true,
     onDismount() {
@@ -326,6 +363,7 @@ export default definePlugin(() => {
       if (pollInterval) {
         clearInterval(pollInterval);
       }
+      dismissAllPluginToasts();
     },
   };
 });

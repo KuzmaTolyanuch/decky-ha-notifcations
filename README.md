@@ -121,9 +121,24 @@ event_data:
   message: "Notification message"
   icon: "mdi:home-assistant"
   icon_color: "lightblue"
+  expiration: 3600000 # Remove from Steam notification tray after 1 hour
 ```
 
 `icon` accepts Home Assistant's `mdi:<icon-name>` format. `icon_color` accepts a CSS color name or value; `color` is also accepted as an alias. For example, `icon: "mdi:map-marker-question-outline"` with `icon_color: "lightblue"` uses the full Material Design Icons set. If `icon` is omitted or unrecognized, the toast uses `mdi:home-assistant`; the default icon color is `#41BDF5`.
+
+`expiration` is optional and is measured in milliseconds. It controls how long the notification remains in the Steam notification tray, independently of the 8-second popup duration. If omitted or invalid, the plugin removes the toast after 24 hours.
+
+#### Dismiss all HA Notify toasts
+
+Send a control event from Home Assistant:
+
+```yaml
+event: steamdeck_notify
+event_data:
+  command: dismiss_all
+```
+
+You can also use the plugin's **Dismiss All Notifications** button. Both methods dismiss HA Notify toasts only, not unrelated Steam notifications.
 
 #### Notification with Action (Click to Open URL)
 
