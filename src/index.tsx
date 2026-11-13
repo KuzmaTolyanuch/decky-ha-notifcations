@@ -4,8 +4,7 @@ import {
   PanelSectionRow,
   staticClasses,
   Focusable,
-  Navigation,
-  EWindowStackingOrder
+  Navigation
 } from "@decky/ui";
 
 import {
@@ -55,7 +54,7 @@ const activeToastHandles = new Map<ToastHandle, number>();
 interface DashboardBrowserView {
   EnableSteamInput(): void;
   SetBounds(x: number, y: number, width: number, height: number): void;
-  SetWindowStackingOrder(order: EWindowStackingOrder): void;
+  SetWindowStackingOrder(order: number): void;
   SetVisible(visible: boolean): void;
   SetFocus(focused: boolean): void;
 }
@@ -377,7 +376,7 @@ export default definePlugin(() => {
         monitor.nFullWidth,
         monitor.nFullHeight,
       );
-      browserView.SetWindowStackingOrder(EWindowStackingOrder.Top);
+      browserView.SetWindowStackingOrder(1); // Steam's EWindowStackingOrder.Top
       browserView.SetVisible(true);
       browserView.EnableSteamInput();
       browserView.SetFocus(true);
