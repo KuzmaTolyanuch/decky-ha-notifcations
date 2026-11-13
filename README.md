@@ -265,18 +265,18 @@ data:
 
 ## Dashboard Viewer
 
-The plugin includes a built-in dashboard viewer accessible from the Quick Access menu:
+The plugin opens Home Assistant in a fullscreen Steam browser view from the Quick Access menu:
 
 1. Open Quick Access Menu (`...` button)
 2. Navigate to Decky → HA Notify
 3. Click **"Open Dashboard"**
-4. Dashboard opens in Steam's CEF browser
-5. Use **right trackpad** as mouse
-6. Press **Steam button → X** to close
+4. Use the right trackpad as a mouse; use the D-pad or left stick to navigate and A to select
+5. Press B to go back; at the first page, B closes the dashboard
+6. Press the Steam or `...` button to close the fullscreen view and return to Decky
 
 **First time setup:**
 - You'll need to log in to Home Assistant once
-- Steam browser saves your login session
+- Steam's embedded browser saves your login session
 - Subsequent opens are automatic (no login needed)
 
 ## Configuration
@@ -697,7 +697,7 @@ A: The plugin will automatically reconnect when the connection is restored.
 A: Yes! Add an `action` field to your event data with a dashboard path or URL, and clicking the notification will open it in Steam's browser.
 
 **Q: How do I view my Home Assistant dashboard?**  
-A: Open the plugin in Quick Access menu and click "Open Dashboard". It opens in Steam's browser. You'll log in once, then sessions are saved.
+A: Open the plugin in Quick Access menu and click "Open Dashboard". It opens fullscreen in Steam's embedded browser. Use the Steam or `...` button to close the view and return to Decky.
 
 **Q: Do I need to configure environment variables in systemd?**  
 A: No! Just create a `.env` file in the plugin directory with your HA_URL and HA_TOKEN.

@@ -10,11 +10,12 @@ import {
 import {
   callable,
   definePlugin,
-  toaster
+  toaster,
+  useQuickAccessVisible
 } from "@decky/api";
 
-import { useState, useEffect } from "react";
-import { FaBell, FaSync, FaExternalLinkAlt } from "react-icons/fa";
+import { useState, useEffect, useRef } from "react";
+import { FaSync } from "react-icons/fa";
 import { resolveNotificationIcon } from "./notificationIcon";
 
 interface Notification {
@@ -51,6 +52,52 @@ type ToastHandle = ReturnType<typeof toaster.toast>;
 
 const activeToastHandles = new Map<ToastHandle, number>();
 
+interface DashboardBrowserView {
+  CanGoBackward(): boolean;
+  EnableSteamInput(): void;
+  ReplaceURL(url: string): void;
+  SetBounds(x: number, y: number, width: number, height: number): void;
+  SetWindowStackingOrder(order: number): void;
+  SetVisible(visible: boolean): void;
+  SetFocus(focused: boolean): void;
+}
+
+interface SteamBrowserApi {
+  BrowserView: {
+    CreatePopup(options?: { strInitialURL?: string }): {
+      strCreateURL: string;
+      browserView: DashboardBrowserView;
+    };
+    Destroy(browserView: DashboardBrowserView): void;
+  };
+  Window: {
+    GetDefaultMonitorDimensions(): Promise<{
+      nFullLeft: number;
+      nFullTop: number;
+      nFullWidth: number;
+      nFullHeight: number;
+    }>;
+  };
+  Input: {
+    RegisterForControllerInputMessages(
+      callback: (controllerIndex: number, gamepadButton: number, isButtonPressed: boolean) => void,
+    ): { unregister(): void };
+    SetWebBrowserActionset(enabled: boolean): void;
+  };
+}
+
+const getSteamBrowserApi = (): SteamBrowserApi => {
+  const steamClient = (window as unknown as { SteamClient?: SteamBrowserApi }).SteamClient;
+  if (!steamClient?.BrowserView || !steamClient?.Window || !steamClient?.Input) {
+    throw new Error("Steam BrowserView API is unavailable");
+  }
+  return steamClient;
+};
+
+let dashboardBrowserView: DashboardBrowserView | null = null;
+let dashboardPopupWindow: Window | null = null;
+let unregisterControllerInput: (() => void) | null = null;
+
 const showTrackedToast = (toastData: Parameters<typeof toaster.toast>[0]) => {
   const expiration = typeof toastData.expiration === "number" && Number.isFinite(toastData.expiration) && toastData.expiration > 0
     ? toastData.expiration
@@ -72,15 +119,36 @@ const dismissAllPluginToasts = () => {
 };
 
 // Main content component
-const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
+const Content = ({
+  onDismissAll,
+  onOpenFullscreenDashboard,
+  onCloseFullscreenDashboard,
+}: {
+  onDismissAll: () => void;
+  onOpenFullscreenDashboard: () => Promise<boolean>;
+  onCloseFullscreenDashboard: () => void;
+}) => {
   const [stats, setStats] = useState<PluginStats | null>(null);
   const [testing, setTesting] = useState(false);
+  const [fullscreenDashboardOpen, setFullscreenDashboardOpen] = useState(false);
+  const isQuickAccessVisible = useQuickAccessVisible();
+  const wasQuickAccessVisible = useRef(isQuickAccessVisible);
 
   useEffect(() => {
     loadStats();
     const interval = setInterval(loadStats, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const justOpenedQuickAccess = isQuickAccessVisible && !wasQuickAccessVisible.current;
+    wasQuickAccessVisible.current = isQuickAccessVisible;
+
+    if (justOpenedQuickAccess && fullscreenDashboardOpen) {
+      onCloseFullscreenDashboard();
+      setFullscreenDashboardOpen(false);
+    }
+  }, [isQuickAccessVisible, fullscreenDashboardOpen, onCloseFullscreenDashboard]);
 
   const loadStats = async () => {
     try {
@@ -91,12 +159,16 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
     }
   };
 
+  const openFullscreenDashboard = async () => {
+    setFullscreenDashboardOpen(await onOpenFullscreenDashboard());
+  };
+
   const testNotification = () => {
     const iconPath = resolveNotificationIcon("mdi:home-assistant");
 
     showTrackedToast({
       title: "Test Notification",
-      body: "This is a test from HA Notify!",
+      body: "This is a test from Home Assistant!",
       duration: 5000,
       logo: iconPath ? (
         <svg
@@ -118,28 +190,6 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
         }
       }
     });
-  };
-
-  const openDashboard = async () => {
-    try {
-      const url = await getDashboardUrl();
-      if (url) {
-        Navigation.NavigateToExternalWeb(url);
-      } else {
-        showTrackedToast({
-          title: "Error",
-          body: "Failed to get dashboard URL",
-          duration: 5000,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to open dashboard:", error);
-      showTrackedToast({
-        title: "Error",
-        body: "Failed to open dashboard",
-        duration: 5000,
-      });
-    }
   };
 
   const testConnection = async () => {
@@ -205,18 +255,13 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
 
       <PanelSection title="Dashboard">
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={openDashboard}
-            icon={<FaExternalLinkAlt />}
-          >
+          <ButtonItem layout="below" onClick={openFullscreenDashboard}>
             Open Dashboard
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ fontSize: "10px", opacity: 0.6, lineHeight: "1.3" }}>
-            Opens in Steam browser. Use right trackpad as mouse.
-            Press Steam button → X to close.
+            D-pad or left stick navigates; A selects. B goes back, or closes the dashboard when there is no previous page. Opening Quick Access also closes it.
           </div>
         </PanelSectionRow>
       </PanelSection>
@@ -278,9 +323,87 @@ const Content = ({ onDismissAll }: { onDismissAll: () => void }) => {
 };
 
 export default definePlugin(() => {
-  console.log("HA Notify initializing");
+  console.log("Home Assistant plugin initializing");
 
   let pollInterval: number | undefined;
+
+  const closeFullscreenDashboard = () => {
+    unregisterControllerInput?.();
+    unregisterControllerInput = null;
+    if (dashboardBrowserView) {
+      try {
+        getSteamBrowserApi().BrowserView.Destroy(dashboardBrowserView);
+      } catch (error) {
+        console.error("Failed to close fullscreen dashboard browser:", error);
+        dashboardBrowserView.SetVisible(false);
+      }
+      dashboardBrowserView = null;
+    }
+    dashboardPopupWindow?.close();
+    dashboardPopupWindow = null;
+    try {
+      getSteamBrowserApi().Input.SetWebBrowserActionset(false);
+    } catch (error) {
+      console.warn("Failed to restore Steam controller action set:", error);
+    }
+  };
+
+  const openFullscreenDashboard = async () => {
+    try {
+      closeFullscreenDashboard();
+      const steamClient = getSteamBrowserApi();
+      const { strCreateURL, browserView } = steamClient.BrowserView.CreatePopup({
+        strInitialURL: "about:blank",
+      });
+      dashboardBrowserView = browserView;
+      const popupWindow = window.open(strCreateURL, "_blank");
+      if (!popupWindow) {
+        throw new Error("Steam blocked the fullscreen browser popup");
+      }
+      dashboardPopupWindow = popupWindow;
+
+      // Open the Steam popup synchronously from the button click to avoid popup
+      // blocking, then replace about:blank after fetching HA's URL.
+      steamClient.Input.SetWebBrowserActionset(true);
+      const controllerInputRegistration = steamClient.Input.RegisterForControllerInputMessages(
+        (_controllerIndex, gamepadButton, isButtonPressed) => {
+          // Steam Input's Web Browser action set handles D-pad, stick, A and
+          // normal browser Back. B closes the popup when there is no history.
+          if (isButtonPressed && gamepadButton === 1 && dashboardBrowserView && !dashboardBrowserView.CanGoBackward()) {
+            closeFullscreenDashboard();
+          }
+        },
+      );
+      unregisterControllerInput = () => controllerInputRegistration.unregister();
+
+      const url = await getDashboardUrl();
+      if (!url) {
+        throw new Error("Failed to get dashboard URL");
+      }
+      const monitor = await steamClient.Window.GetDefaultMonitorDimensions();
+      browserView.SetBounds(
+        monitor.nFullLeft,
+        monitor.nFullTop,
+        monitor.nFullWidth,
+        monitor.nFullHeight,
+      );
+      browserView.SetWindowStackingOrder(1); // Steam's EWindowStackingOrder.Top
+      browserView.SetVisible(true);
+      browserView.EnableSteamInput();
+      browserView.ReplaceURL(url);
+      browserView.SetFocus(true);
+      return true;
+    } catch (error) {
+      closeFullscreenDashboard();
+      console.error("Failed to open fullscreen dashboard:", error);
+      showTrackedToast({
+        title: "Fullscreen dashboard failed",
+        body: error instanceof Error ? error.message : String(error),
+        duration: 8000,
+      });
+      return false;
+    }
+  };
 
   const checkForNotifications = async () => {
     try {
@@ -351,18 +474,30 @@ export default definePlugin(() => {
   };
 
   pollInterval = window.setInterval(checkForNotifications, 1000);
+  const homeAssistantIcon = resolveNotificationIcon("mdi:home-assistant");
 
   return {
-    name: "HA Notify",
-    titleView: <div className={staticClasses.Title}>HA Notify</div>,
-    content: <Content onDismissAll={dismissAllPluginToasts} />,
-    icon: <FaBell />,
+    name: "Home Assistant",
+    titleView: <div className={staticClasses.Title}>Home Assistant</div>,
+    content: (
+      <Content
+        onDismissAll={dismissAllPluginToasts}
+        onOpenFullscreenDashboard={openFullscreenDashboard}
+        onCloseFullscreenDashboard={closeFullscreenDashboard}
+      />
+    ),
+    icon: homeAssistantIcon ? (
+      <svg width={24} height={24} viewBox="0 0 24 24" aria-hidden="true">
+        <path d={homeAssistantIcon} fill="currentColor" />
+      </svg>
+    ) : <FaSync />,
     alwaysRender: true,
     onDismount() {
-      console.log("HA Notify unloading");
+      console.log("Home Assistant plugin unloading");
       if (pollInterval) {
         clearInterval(pollInterval);
       }
+      closeFullscreenDashboard();
       dismissAllPluginToasts();
     },
   };
